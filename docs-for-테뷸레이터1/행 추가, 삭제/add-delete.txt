@@ -1,0 +1,65 @@
+==============================
+행 추가 / 삭제
+파일: src/routes/grid-add-delete.tsx
+==============================
+
+1. 행 추가 (addRow)
+------------------------------
+table.addRow(데이터객체, 위치)
+
+  // 맨 아래에 추가
+  table.addRow({ id: 4, name: '', age: 0, position: '개발자' }, false)
+
+  // 맨 위에 추가
+  table.addRow({ id: 4, name: '', age: 0, position: '개발자' }, true)
+
+  // 특정 행 위에 추가 (3번째 파라미터 = 기준 행)
+  table.addRow({ ... }, true, referenceRow)
+
+
+2. 행 삭제
+------------------------------
+방법 1) 행 객체에서 직접 삭제
+  row.delete()
+
+방법 2) 컬럼에 삭제 버튼 넣기
+  {
+    title: '삭제',
+    formatter: 'buttonCross',       // X 버튼 표시
+    width: 80,
+    headerSort: false,
+    cellClick: (_e, cell) => {
+      cell.getRow().delete()
+    },
+  }
+
+방법 3) 특정 조건으로 행 찾아서 삭제
+  table.getRows().forEach((row) => {
+    if (row.getData().age < 20) {
+      row.delete()
+    }
+  })
+
+
+3. React에서 테이블 인스턴스 접근
+------------------------------
+useRef로 Tabulator 인스턴스를 저장해서 버튼 이벤트에서 사용:
+
+  const tabulatorRef = useRef<Tabulator | null>(null)
+
+  useEffect(() => {
+    const table = new Tabulator(...)
+    tabulatorRef.current = table
+    return () => table.destroy()
+  }, [])
+
+  const handleAdd = () => {
+    tabulatorRef.current?.addRow({ ... })
+  }
+
+
+4. 전체 데이터 조회
+------------------------------
+  table.getData()          // 현재 테이블의 모든 데이터 (배열)
+  table.getDataCount()     // 행 개수
+  table.searchData(...)    // 조건으로 검색

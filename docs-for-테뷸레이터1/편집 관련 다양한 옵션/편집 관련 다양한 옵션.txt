@@ -1,0 +1,153 @@
+==============================
+편집 관련 옵션 상세 정리
+==============================
+
+
+1. editor — 편집기 종류
+==============================
+
+컬럼 정의에서 editor를 지정하면 더블클릭 시 해당 편집기가 활성화됨.
+
+  'input'
+    - 일반 텍스트 입력 (한 줄)
+    - 가장 기본적인 편집기
+    - { title: '이름', field: 'name', editor: 'input' }
+
+  'number'
+    - 숫자 전용 입력 (숫자만 입력 가능)
+    - 위/아래 화살표로 값 조절 가능
+    - { title: '나이', field: 'age', editor: 'number' }
+
+  'textarea'
+    - 여러 줄 텍스트 입력
+    - 셀이 확장되면서 큰 입력창이 나타남
+    - 비고, 메모 같은 긴 텍스트에 적합
+    - { title: '비고', field: 'memo', editor: 'textarea' }
+
+  'list'
+    - 드롭다운 선택
+    - editorParams.values로 선택지를 지정
+    - { title: '직책', field: 'position', editor: 'list',
+        editorParams: { values: ['개발자', '디자이너', '기획자'] } }
+
+  'star'
+    - 별점 입력 (1~5)
+    - 클릭으로 별 개수 선택
+    - { title: '평점', field: 'rating', editor: 'star' }
+
+  'tickCross'
+    - 체크박스 (true/false)
+    - 클릭으로 토글
+    - { title: '활성', field: 'active', editor: 'tickCross' }
+
+  editor를 안 넣으면 → 해당 컬럼은 읽기 전용 (편집 불가)
+
+
+2. editorParams — 편집기별 세부 설정
+==============================
+
+  ■ list 편집기
+    editorParams: {
+      values: ['개발자', '디자이너', '기획자'],  // 고정 선택지
+    }
+
+    editorParams: {
+      values: {                          // key-value 방식 (표시값 ≠ 저장값)
+        'dev': '개발자',
+        'design': '디자이너',
+      }
+    }
+
+    editorParams: {
+      valuesLookup: true,                // 해당 컬럼의 기존 데이터에서 자동 추출
+    }
+
+    editorParams: {
+      autocomplete: true,                // 타이핑으로 필터링 가능
+      values: ['개발자', '디자이너', '기획자'],
+    }
+
+    editorParams: {
+      multiselect: true,                 // 다중 선택 가능
+      values: ['React', 'Vue', 'Angular'],
+    }
+
+  ■ number 편집기
+    editorParams: {
+      min: 0,       // 최소값
+      max: 100,     // 최대값
+      step: 1,      // 증감 단위 (화살표 클릭 시)
+    }
+
+    editorParams: {
+      min: 0,
+      max: 999999,
+      step: 1000,   // 1000 단위로 증감
+    }
+
+  ■ textarea 편집기
+    editorParams: {
+      verticalNavigation: 'editor',      // 위아래 키가 셀 이동 대신 줄바꿈
+    }
+
+  ■ star 편집기
+    editorParams: {
+      stars: 5,     // 별 개수 (기본 5)
+    }
+
+
+3. validator — 입력값 검증
+==============================
+
+셀 편집 후 값이 유효한지 검증. 실패하면 셀이 빨간색으로 표시됨.
+
+  ■ 내장 검증자
+    validator: 'required'           // 빈 값 불가
+    validator: 'unique'             // 같은 컬럼에서 중복 불가
+    validator: 'integer'            // 정수만
+    validator: 'float'              // 소수점 포함 숫자
+    validator: 'min:0'              // 최소값 0
+    validator: 'max:100'            // 최대값 100
+    validator: 'minLength:2'        // 최소 2글자
+    validator: 'maxLength:50'       // 최대 50글자
+
+  ■ 여러 개 동시 적용
+    validator: ['required', 'min:0', 'max:100']
+
+  ■ 커스텀 검증 함수
+    validator: (cell, value) => {
+      // true를 반환하면 통과, false면 실패
+      return value.length >= 2 && value.length <= 10
+    }
+
+  ■ 컬럼 정의 예시
+    {
+      title: '나이',
+      field: 'age',
+      editor: 'number',
+      editorParams: { min: 0, max: 150, step: 1 },
+      validator: ['required', 'min:0', 'max:150'],
+    }
+
+    {
+      title: '이름',
+      field: 'name',
+      editor: 'input',
+      validator: ['required', 'minLength:2'],
+    }
+
+
+4. 기타 편집 관련 옵션
+==============================
+
+  ■ 컬럼 단위
+    editable: false              // editor가 있어도 편집 비활성화
+    editable: (cell) => {        // 조건부 편집 (함수로 제어)
+      return cell.getRow().getData().id < 0   // 예: 신규 행(음수 ID)만 편집 가능
+      // id > 0 이면 기존 행만 편집 가능. 조건은 상황에 따라 자유롭게 지정.
+    }
+
+  ■ 테이블 단위 (Tabulator 옵션)
+    editTriggerEvent: 'click'    // 클릭 한 번으로 편집 (기본은 더블클릭)
+    editTriggerEvent: 'dblclick' // 더블클릭으로 편집 (기본값)
+    editTriggerEvent: 'focus'    // 포커스 시 바로 편집

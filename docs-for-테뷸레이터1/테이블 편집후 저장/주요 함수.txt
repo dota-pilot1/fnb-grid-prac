@@ -1,0 +1,58 @@
+  const handleSave = async () => {
+    // 1) 신규 행 데이터 수집 (임시 ID 제거)
+    const created: Omit<Employee, "id">[] = [];
+
+    // 추가된 행에 해당하는것들만 모아서 created 배열에 추가
+    for (const id of addedRows.current) {
+      const row = tabulatorRef.current
+        ?.getRows()
+        .find((r) => r.getData().id === id);
+      if (!row) continue;
+      const { id: _tempId, ...data } = row.getData();
+      created.push(data);
+    }
+
+    // 2) 수정된 행 데이터 수집
+    // 수정된 행의 벨류만 가져와서 다시 배열로
+    const updated = Array.from(modifiedRows.current.values());
+
+    // 3) 삭제된 행 ID 수집
+    // 삭제된 행의 아이디들을 배열로
+    const deletedIdList = Array.from(deletedIds.current);
+
+    // 변경사항 없으면 리턴
+    if (
+      created.length === 0 &&
+      updated.length === 0 &&
+      deletedIdList.length === 0
+    ) {
+      addLog("변경사항 없음");
+      return;
+    }
+
+    // 4) 한 번에 전송
+    const res = await fetch(`${API_URL}/batch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        created,
+        updated,
+        deletedIds: deletedIdList,
+      }),
+    });
+    const result = await res.json();
+
+    // 5) 서버 응답 후 테이블 새로고침 (정식 ID 반영)
+    const reloadRes = await fetch(API_URL);
+    const freshData = await reloadRes.json();
+    tabulatorRef.current?.setData(freshData);
+
+    // 6) 추적 초기화
+    addedRows.current.clear();
+    modifiedRows.current.clear();
+    deletedIds.current.clear();
+
+    addLog(
+      `저장 완료 → 추가:${result.created.length}건, 수정:${result.updatedCount}건, 삭제:${result.deletedCount}건`,
+    );
+  };

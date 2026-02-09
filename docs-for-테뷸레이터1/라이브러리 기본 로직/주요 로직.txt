@@ -1,0 +1,68 @@
+==============================
+Tabulator + React 주요 로직 정리
+==============================
+
+1. 초기화 방식
+------------------------------
+- react-tabulator 래퍼는 React 16 의존이라 구버전 → 사용 안 함
+- tabulator-tables를 직접 import해서 useRef + useEffect로 초기화
+
+  import { TabulatorFull as Tabulator } from 'tabulator-tables'
+
+  const tableRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const table = new Tabulator(tableRef.current, { ...옵션 })
+    return () => table.destroy()   // cleanup 필수
+  }, [])
+
+
+2. 핵심 옵션
+------------------------------
+- data: 테이블에 표시할 데이터 배열
+- layout: 컬럼 레이아웃 방식
+    'fitColumns'  → 컬럼이 테이블 너비에 맞게 자동 조절
+    'fitData'     → 데이터 크기에 맞게 조절
+    'fitDataFill' → 데이터에 맞추되 남은 공간 채움
+- columns: 컬럼 정의 배열
+
+
+3. 컬럼 정의 (columns)
+------------------------------
+주요 속성:
+  {
+    title: '표시 이름',
+    field: 'data 객체의 key',
+    width: 80,                    // 고정 너비 (px)
+    hozAlign: 'center',           // 정렬: left, center, right
+    editor: 'input',              // 편집기 타입
+    editorParams: { ... },        // 편집기 옵션
+  }
+
+편집기(editor) 종류:
+  - 'input'    : 텍스트 입력
+  - 'number'   : 숫자 입력
+  - 'list'     : 드롭다운 선택 (editorParams.values 로 옵션 지정)
+  - 'textarea' : 여러 줄 텍스트
+  - 'star'     : 별점
+  - 'tickCross': 체크박스 (true/false)
+
+
+4. React에서 사용 시 주의점
+------------------------------
+- useEffect cleanup에서 반드시 table.destroy() 호출
+  → 안 하면 HMR이나 리렌더 시 테이블이 중복 생성됨
+- CSS import 필수: 'tabulator-tables/dist/css/tabulator.min.css'
+- ref로 빈 div를 전달하고, Tabulator가 해당 div 안에 테이블을 렌더링함
+  → React의 가상 DOM과 별개로 Tabulator가 직접 DOM을 조작하는 구조
+
+
+5. 프로젝트 구조
+------------------------------
+src/
+├── main.tsx              # RouterProvider로 앱 진입
+├── routes/
+│   ├── __root.tsx        # 루트 레이아웃 (네비게이션 바)
+│   ├── index.tsx         # / (홈 페이지)
+│   └── grid.tsx          # /grid (Tabulator 그리드 페이지)
+└── routeTree.gen.ts      # TanStack Router 플러그인이 자동 생성

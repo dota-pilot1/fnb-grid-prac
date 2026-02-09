@@ -1,0 +1,95 @@
+테뷸레이터에서 useRef 를 사용하는 주요 로직
+
+1. 테이블 돔 참조 및 테이블 생성에 활용
+  a. jsx 에 ref={tableRef} 를 설정
+     <div ref={tableRef} />
+  b. 테이블을 useRef 로 참조
+     const tableRef = useRef<HTMLDivElement>(null)
+
+  c. 테이블 기본 설정에 활용
+    const table = new Tabulator(tableRef.current, {
+      layout: "fitColumns",
+      columns: [
+        { title: "ID", field: "id", width: 80, hozAlign: "center" },
+        { title: "이름", field: "name", editor: "input" },
+        { title: "나이", field: "age", editor: "number", hozAlign: "center" },
+        {
+          title: "직책",
+          field: "position",
+          editor: "list",
+          editorParams: { values: ["개발자", "디자이너", "기획자", "매니저"] },
+        },
+        {
+          title: "삭제",
+          formatter: "buttonCross",
+          width: 80,
+          hozAlign: "center",
+          headerSort: false,
+          cellClick: (_e: Event, cell: Tabulator.CellComponent) => {
+            const id = cell.getRow().getData().id;
+
+            if (addedRows.current.has(id)) {
+              // 신규 행 삭제 → 추적에서 제거만 하면 됨
+              addedRows.current.delete(id);
+            } else {
+              // 기존 행 삭제 → 삭제 목록에 추가
+              deletedIds.current.add(id);
+              modifiedRows.current.delete(id);
+            }
+
+            cell.getRow().delete();
+            addLog(`행 삭제 id:${id}`);
+          },
+        },
+      ],
+    });
+
+2. 테이블의 변경 데이터 추적에도 사용
+  (추가행, 수정행, 삭제행들에 대한 데이터를 useRef 로 참조 한뒤 아래와 같이 관리)
+
+  2.1. 아래와 같이 선언
+    const addedRows = useRef<Set<number>>(new Set())
+    const modifiedRows = useRef<Map<number, Employee>>(new Map())
+    const deletedIds = useRef<Set<number>>(new Set())
+
+  2.2. 아래와 같이 접근
+    addedRows.current.add(-1)    // Set에 추가, 리렌더링 안 됨
+    addedRows.current.has(-1)    // true, 리렌더링 안 됨
+    addedRows.current.clear()    // 비우기, 리렌더링 안 됨
+
+  2.3 내부적 동작
+    // useRef 내부적으로 이런 객체를 만듦
+    addedRows = { current: new Set() }
+
+    // 그래서 Set에 접근하려면 항상 .current를 거쳐야 함
+    addedRows.current.add(-1)
+    // ↑ 상자를 열고   ↑ Set의 메서드 호출
+
+  2.4 const addedRows = new Set() 으로 선언하면 안되는 이유
+    // 일반 변수
+    const addedRows = new Set()
+    // → 컴포넌트가 리렌더링될 때마다 new Set()이 새로 만들어짐
+    // → 기존에 add한 데이터 다 사라짐
+
+    // useRef
+    const addedRows = useRef(new Set())
+    // → 리렌더링돼도 같은 Set 객체가 유지됨
+    // → addedRows.current는 항상 처음 만든 그 Set
+
+3. 라이브러리 인스턴스 만들어서 활용
+    step1:
+      const tabulatorRef = useRef<Tabulator | null>(null)
+
+    step2:
+          tabulatorRef.current = table;
+
+    step3:
+    const handleAdd = () => {
+        const id = tempId--;
+        tabulatorRef.current?.addRow(
+        { id, name: "", age: 0, position: "개발자" },
+        false,
+        );
+        addedRows.current.add(id);
+        addLog(`행 추가 (임시 id:${id})`);
+    };

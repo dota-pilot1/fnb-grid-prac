@@ -1,0 +1,84 @@
+==============================
+tabulatorRef로 행 추가하기
+==============================
+
+
+1. 코드
+==============================
+
+  tabulatorRef.current?.addRow(
+    { id, name: '', age: 0, position: '개발자' },
+    false,
+  )
+
+  - 첫 번째 인자: 추가할 행 데이터 (객체)
+  - 두 번째 인자: true = 맨 위, false = 맨 아래
+
+
+2. 이게 하는 일
+==============================
+
+  tabulatorRef.current  →  Tabulator 인스턴스 (라이브러리 객체)
+  .addRow(...)          →  Tabulator가 직접 DOM에 <tr> 삽입
+
+  React가 하는 일: 없음
+  Tabulator가 하는 일: DOM 직접 조작해서 행 추가
+
+
+3. 라이브러리적 특성
+==============================
+
+  일반적인 React 방식:
+    setState → 리렌더링 → 가상 DOM 비교 → 실제 DOM 업데이트
+    (React가 DOM을 관리)
+
+  Tabulator 방식:
+    tabulatorRef.current.addRow() → 바로 실제 DOM 업데이트
+    (Tabulator가 DOM을 관리, React는 모름)
+
+  즉, React의 렌더링 사이클을 완전히 우회함.
+  React 입장에서는 아무 일도 안 일어난 것.
+  화면이 바뀌는 건 Tabulator가 알아서 한 것.
+
+  이게 useRef로 인스턴스를 잡는 이유:
+  - useState로 잡으면 리렌더링 유발 → Tabulator 재생성 위험
+  - useRef는 값이 바뀌어도 리렌더링 안 됨 → 안전하게 인스턴스 보관
+
+
+4. tabulatorRef로 할 수 있는 주요 메서드들
+==============================
+
+  행 관련:
+    .addRow(data, position)     // 행 추가
+    .deleteRow(id)              // 행 삭제
+    .updateRow(id, data)        // 행 업데이트
+    .getRows()                  // 전체 행 배열 반환
+    .getRow(id)                 // 특정 행 반환
+
+  데이터 관련:
+    .getData()                  // 전체 데이터 배열 반환
+    .setData(data)              // 데이터 전체 교체 (화면도 갱신)
+    .getDataCount()             // 행 개수
+
+  테이블 관련:
+    .destroy()                  // 테이블 제거 (cleanup)
+    .redraw()                   // 화면 다시 그리기
+
+  이 메서드들 전부 React를 거치지 않고 DOM을 직접 조작함.
+
+
+5. 왜 이런 구조인가
+==============================
+
+  Tabulator는 원래 바닐라 JS / jQuery 용 라이브러리.
+  React 이전부터 존재했고, 자체 DOM 관리 시스템이 있음.
+
+  React에서 쓰려면:
+    1) useRef로 빈 div를 잡고
+    2) useEffect에서 new Tabulator(div, 옵션)으로 마운트
+    3) tabulatorRef에 인스턴스 저장
+    4) 버튼 핸들러 등에서 tabulatorRef.current.메서드() 호출
+    5) cleanup에서 .destroy()
+
+  결국 React 안에서 React 아닌 라이브러리를 쓰는 패턴.
+  D3.js, Chart.js 같은 DOM 직접 조작 라이브러리도 전부 이 패턴.

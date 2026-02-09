@@ -1,0 +1,147 @@
+==============================
+행 추가/수정/삭제 + 저장 흐름 (변경분 추적 방식)
+==============================
+
+핵심: 프론트에서 변경분(추가/수정/삭제)을 추적하고, [저장] 시 각각 POST/PUT/DELETE 호출
+
+
+1. 전체 흐름
+==============================
+
+  [페이지 진입]
+  GET /api/employees → table.setData(data)
+       ↓
+  [행 추가] → addRow(임시ID) + addedRows에 추적
+  [셀 편집] → UI 반영 + modifiedRows에 추적
+  [행 삭제] → row.delete() + deletedIds에 추적
+       ↓
+  [저장] 클릭
+  addedRows    → 각각 POST /api/employees      (신규 생성)
+  modifiedRows → 각각 PUT /api/employees/:id    (수정)
+  deletedIds   → 각각 DELETE /api/employees/:id (삭제)
+       ↓
+  추적 초기화
+
+
+2. 변경 추적 구조
+==============================
+
+  const addedRows = useRef<Set<number>>(new Set())             // 신규 행 임시 ID
+  const modifiedRows = useRef<Map<number, Employee>>(new Map()) // 수정된 행 데이터
+  const deletedIds = useRef<Set<number>>(new Set())             // 삭제할 서버 ID
+
+
+3. 행 추가
+==============================
+
+  let tempId = -1
+
+  const handleAdd = () => {
+    const id = tempId--
+    tabulatorRef.current?.addRow({ id, name: '', age: 0, position: '개발자' }, false)
+    addedRows.current.add(id)   // 추적에 등록
+  }
+
+  - 임시 ID를 음수로 부여 (-1, -2, ...)
+  - addedRows Set에 등록
+  - 서버 통신 없음
+
+
+4. 셀 편집 추적
+==============================
+
+  table.on('cellEdited', (cell) => {
+    const rowData = cell.getRow().getData()
+    const id = rowData.id
+
+    if (addedRows.current.has(id)) {
+      // 신규 행 → 이미 addedRows에서 추적 중, 별도 처리 불필요
+    } else {
+      // 기존 행 → modifiedRows에 등록
+      modifiedRows.current.set(id, rowData)
+    }
+  })
+
+  - 신규 행 편집: 어차피 저장 시 POST로 전체 데이터 전송하므로 추가 추적 불필요
+  - 기존 행 편집: modifiedRows Map에 id → 최신 데이터로 저장
+
+
+5. 행 삭제 추적
+==============================
+
+  cellClick: (_e, cell) => {
+    const id = cell.getRow().getData().id
+
+    if (addedRows.current.has(id)) {
+      addedRows.current.delete(id)     // 신규 행 → 추적에서 제거만
+    } else {
+      deletedIds.current.add(id)       // 기존 행 → 삭제 목록에 추가
+      modifiedRows.current.delete(id)  // 수정 추적에서도 제거
+    }
+
+    cell.getRow().delete()
+  }
+
+  - 신규 행 삭제: 서버에 없으니까 추적에서 빼기만 하면 됨
+  - 기존 행 삭제: deletedIds에 등록, modifiedRows에서 제거 (삭제할 건데 수정할 필요 없음)
+
+
+6. 저장 (변경분만 서버 전송)
+==============================
+
+  const handleSave = async () => {
+    // 1) 신규 행 → POST
+    for (const id of addedRows.current) {
+      const row = table.getRows().find(r => r.getData().id === id)
+      const { id: _tempId, ...data } = row.getData()   // 임시 ID 제거
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+      const created = await res.json()
+      row.update({ id: created.id })   // 임시 ID → 서버 ID로 교체
+    }
+
+    // 2) 수정된 행 → PUT
+    for (const [id, data] of modifiedRows.current) {
+      await fetch(`${API_URL}/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+    }
+
+    // 3) 삭제된 행 → DELETE
+    for (const id of deletedIds.current) {
+      await fetch(`${API_URL}/${id}`, { method: 'DELETE' })
+    }
+
+    // 추적 초기화
+    addedRows.current.clear()
+    modifiedRows.current.clear()
+    deletedIds.current.clear()
+  }
+
+
+7. 새로고침 (편집 내용 버리기)
+==============================
+
+  const handleReload = async () => {
+    const res = await fetch(API_URL)
+    const data = await res.json()
+    tabulatorRef.current?.setData(data)
+
+    // 추적도 초기화
+    addedRows.current.clear()
+    modifiedRows.current.clear()
+    deletedIds.current.clear()
+  }
+
+
+8. 왜 이 방식인가
+==============================
+  - 변경된 것만 서버에 보내므로 네트워크 효율적
+  - 신규/수정/삭제를 명확히 구분해서 처리
+  - 서버에 쓰레기 데이터 안 쌓임
+  - 실무에서 그리드 CRUD의 정석 패턴

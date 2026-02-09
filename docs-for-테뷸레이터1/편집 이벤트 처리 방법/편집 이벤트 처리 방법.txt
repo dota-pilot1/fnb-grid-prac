@@ -1,0 +1,25 @@
+1. 편집 이벤트 관련 함수
+------------------------------
+table.on('cellEdited', (cell) => {
+  cell.getField()      // 변경된 컬럼명 (ex: 'name')
+  cell.getOldValue()   // 이전 값
+  cell.getValue()      // 새 값
+  cell.getRow().getData()  // 해당 행 전체 데이터
+})
+
+table.on('cellEditCancelled', (cell) => {
+  // ESC 누르거나 값 변경 없이 빠져나올 때
+})
+
+
+2. 실무 패턴
+------------------------------
+cellEdited 이벤트에서 API 호출로 서버 업데이트:
+
+  table.on('cellEdited', async (cell) => {
+    const rowData = cell.getRow().getData()
+    await fetch(`/api/update/${rowData.id}`, {
+      method: 'PUT',
+      body: JSON.stringify(rowData),
+    })
+  })

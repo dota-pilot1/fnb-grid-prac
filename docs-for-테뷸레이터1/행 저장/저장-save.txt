@@ -1,0 +1,63 @@
+==============================
+데이터 저장 (Save)
+파일: src/routes/grid-save.tsx
+==============================
+
+1. 핵심: getData()
+------------------------------
+Tabulator는 자체 저장 기능이 없다.
+테이블의 현재 데이터를 getData()로 꺼내서 직접 API 호출해야 한다.
+
+  const data = table.getData()
+  // → [{ id: 1, name: '홍길동', ... }, { id: 2, ... }, ...]
+
+
+2. 저장 패턴 (전체 저장)
+------------------------------
+  const handleSave = async () => {
+    const data = table.getData()
+    await fetch('/api/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+  }
+
+
+3. 저장 패턴 (변경분만 저장)
+------------------------------
+cellEdited 이벤트로 변경된 행만 추적:
+
+  const changedRows = new Map()
+
+  table.on('cellEdited', (cell) => {
+    const row = cell.getRow()
+    const data = row.getData()
+    changedRows.set(data.id, data)
+  })
+
+  const handleSave = async () => {
+    const changes = Array.from(changedRows.values())
+    await fetch('/api/save-changes', {
+      method: 'POST',
+      body: JSON.stringify(changes),
+    })
+    changedRows.clear()
+  }
+
+
+4. 기타 데이터 추출 메서드
+------------------------------
+  table.getData()                    // 전체 데이터
+  table.getData('active')            // 현재 필터링된 데이터만
+  table.getSelectedData()            // 선택된 행만 (selectable 옵션 필요)
+  table.download('csv', 'data.csv')  // CSV 다운로드
+  table.download('json', 'data.json') // JSON 다운로드
+  table.download('xlsx', 'data.xlsx') // Excel 다운로드 (SheetJS 필요)
+
+
+5. 요약 흐름
+------------------------------
+  [더블클릭 편집] → [cellEdited 이벤트] → [변경 추적]
+       ↓
+  [저장 버튼 클릭] → [getData() or 변경분] → [API POST]
