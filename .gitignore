@@ -4,3 +4,21 @@ dist-ssr
 *.local
 .DS_Store
 *.log
+
+# IDE
+.idea/
+.vscode/
+*.sw?
+
+# Java / Gradle
+build/
+.gradle/
+*.class
+
+# SQLite
+*.db
+*.db-wal
+*.db-shm
+
+# Vite
+.vite/

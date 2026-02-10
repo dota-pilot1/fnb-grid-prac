@@ -1,0 +1,243 @@
+========================================
+  서버사이드 페이지네이션 정리
+========================================
+
+■ 왜 서버사이드인가?
+
+  클라이언트 사이드: 서버에서 전체 데이터(1,000건)를 한번에 받아서 프론트에서 정렬/필터/페이지 처리
+  서버사이드:       프론트가 "몇 페이지, 몇 건, 어떤 정렬" 요청 → 서버가 해당 조건만 DB에서 꺼내서 응답
+
+  데이터가 많아지면(1,000건+) 서버사이드가 필수.
+  - 네트워크: 항상 20건만 전송 (vs 전체 1,000건)
+  - 성능: DB 인덱스로 정렬/필터 (vs JS로 처리)
+  - 메모리: 브라우저 부담 없음
+
+
+========================================
+  1. 백엔드 (NestJS + Drizzle)
+========================================
+
+■ API 설계
+
+  기존 GET /api/employees                → 전체 조회 (배열 반환)
+  추가 GET /api/employees?page=1&size=20 → 서버사이드 (페이지네이션 객체 반환)
+
+  같은 엔드포인트에서 page 파라미터 유무로 분기한다.
+  기존 API 연동 페이지 (grid-api)는 그대로 동작.
+
+
+■ 쿼리 파라미터
+
+  page   : 페이지 번호 (1부터 시작)
+  size   : 페이지당 건수 (기본 20)
+  sort   : 정렬 컬럼명 (id, name, age, position)
+  dir    : 정렬 방향 (asc / desc)
+  filter : JSON 배열 [{"field":"name","value":"김"}]
+
+
+■ 응답 형태 (Tabulator가 요구하는 형식)
+
+  {
+    "last_page": 50,       ← 총 페이지 수
+    "data": [              ← 현재 페이지 데이터
+      { "id": 1, "name": "김민수", "age": 22, "position": "개발자" },
+      ...
+    ]
+  }
+
+  Tabulator는 last_page와 data 필드를 기본으로 인식한다.
+
+
+■ 컨트롤러 (employees.controller.ts)
+
+  @Get()
+  findAll(
+    @Query('page') page?: string,
+    @Query('size') size?: string,
+    @Query('sort') sort?: string,
+    @Query('dir') dir?: 'asc' | 'desc',
+    @Query('filter') filterJson?: string,
+  ) {
+    if (page) {
+      const filter = filterJson ? JSON.parse(filterJson) : undefined;
+      return this.employeesService.findPaginated({
+        page: parseInt(page, 10),
+        size: parseInt(size || '20', 10),
+        sort, dir, filter,
+      });
+    }
+    return this.employeesService.findAll();
+  }
+
+  핵심: page가 있으면 findPaginated, 없으면 findAll
+
+
+■ 서비스 - findPaginated (employees.service.ts)
+
+  findPaginated(query) {
+    // 1) 컬럼맵으로 안전하게 컬럼 참조
+    const columnMap = {
+      id: employees.id,
+      name: employees.name,
+      age: employees.age,
+      position: employees.position,
+    };
+
+    // 2) WHERE 조건 (like 검색)
+    filter가 있으면 like(col, '%값%') 조건을 만들어서 AND로 결합
+
+    // 3) 정렬
+    sort 파라미터로 받은 컬럼을 asc/desc로 정렬
+
+    // 4) COUNT(*) 로 총 건수 조회
+    // 5) LIMIT + OFFSET 으로 해당 페이지 데이터만 조회
+    // 6) { last_page: Math.ceil(total / size), data } 반환
+  }
+
+  Drizzle 핵심 함수들:
+  - like(col, '%검색어%')  → LIKE 검색
+  - asc(col) / desc(col)  → 정렬
+  - .limit(size)           → 페이지 크기
+  - .offset((page-1)*size) → 건너뛸 건수
+  - sql`COUNT(*)`          → 집계
+
+
+========================================
+  2. 프론트엔드 (Tabulator 서버사이드 모드)
+========================================
+
+■ 핵심 설정 옵션
+
+  const table = new Tabulator(el, {
+    // 페이지네이션 ON + 서버사이드
+    pagination: true,            ← 이거 없으면 페이지네이션 UI 안 나옴!
+    paginationMode: "remote",    ← 서버에서 데이터 받기
+    paginationSize: 20,          ← 페이지당 건수
+    paginationSizeSelector: [10, 20, 50, 100],  ← 사용자 선택 UI
+
+    // 정렬/필터도 서버사이드
+    sortMode: "remote",
+    filterMode: "remote",
+
+    // 서버 URL
+    ajaxURL: "http://localhost:3000/api/employees",
+
+    // 커스텀 요청 함수
+    ajaxRequestFunc: (url, config, params) => { ... },
+  });
+
+
+■ ajaxRequestFunc — 왜 필요한가?
+
+  Tabulator가 기본으로 보내는 파라미터 형태와 우리 서버가 받는 형태가 다르다.
+  ajaxRequestFunc로 요청을 직접 구성한다.
+
+  ajaxRequestFunc: (url, _config, params) => {
+    // params에 들어오는 값:
+    // params.page    → 현재 페이지 (1, 2, 3...)
+    // params.size    → 페이지 크기 (20)
+    // params.sorters → [{ field: "name", dir: "asc" }]  ← sort 아님! sorters!
+    // params.filters → [{ field: "name", type: "like", value: "김" }]
+
+    const query = new URLSearchParams();
+    query.set("page", params.page);
+    query.set("size", params.size);
+
+    if (params.sorters?.length > 0) {
+      query.set("sort", params.sorters[0].field);
+      query.set("dir", params.sorters[0].dir);
+    }
+
+    if (params.filters?.length > 0) {
+      query.set("filter", JSON.stringify(
+        params.filters.map(f => ({ field: f.field, value: f.value }))
+      ));
+    }
+
+    return fetch(`${url}?${query}`)
+      .then(res => res.json());
+  }
+
+  주의: params.sort가 아니라 params.sorters 이다!
+
+
+■ 헤더 필터 (headerFilter)
+
+  컬럼 정의에 headerFilter를 추가하면 헤더 아래에 입력란이 생긴다.
+  사용자가 타이핑하면 자동으로 서버에 필터 요청이 간다.
+
+  columns: [
+    { title: "이름", field: "name", headerFilter: "input" },
+    { title: "직책", field: "position", headerFilter: "input" },
+  ]
+
+
+■ 서버 응답 형식
+
+  Tabulator remote 모드는 이 형태를 기대한다:
+  {
+    "last_page": 50,    ← 필수! 총 페이지 수
+    "data": [...]       ← 필수! 현재 페이지 데이터
+  }
+
+  이 두 필드가 없으면 데이터가 안 나온다.
+
+
+========================================
+  3. 데이터 흐름 정리
+========================================
+
+  [사용자가 2페이지 클릭]
+      ↓
+  [Tabulator] ajaxRequestFunc 호출
+      params = { page: 2, size: 20, sorters: [...], filters: [...] }
+      ↓
+  [fetch] GET /api/employees?page=2&size=20&sort=name&dir=asc
+      ↓
+  [NestJS Controller] page 있음 → findPaginated 호출
+      ↓
+  [Service] Drizzle 쿼리
+      SELECT * FROM employees
+      WHERE name LIKE '%김%'
+      ORDER BY name ASC
+      LIMIT 20 OFFSET 20
+      ↓
+  [응답] { last_page: 50, data: [...20건...] }
+      ↓
+  [Tabulator] 테이블 렌더링 + 페이지네이션 UI 업데이트
+
+
+========================================
+  4. 시드 데이터 (1,000건)
+========================================
+
+  db.module.ts에서 테이블이 비어있을 때 자동 삽입.
+
+  이름: 성(10개) x 이름(10개) 조합 → "김민수", "이지은", "박서연"...
+  나이: 22~51세 반복
+  직책: 개발자, 디자이너, 기획자, 매니저, 마케터, 영업, QA, 데이터분석가, DevOps, 인턴
+
+  100건씩 나눠서 INSERT (SQLite 변수 제한 회피)
+
+
+========================================
+  5. 트러블슈팅
+========================================
+
+  Q: 데이터가 안 나온다 (빈 테이블)
+  A: 브라우저 콘솔(F12)에서 에러 확인.
+     - CORS 에러 → 백엔드 main.ts에 app.enableCors() 확인
+     - 404 → 백엔드 서버(3000번 포트) 떠있는지 확인
+     - 응답 형식 → { last_page, data } 형태인지 확인
+
+  Q: 페이지네이션 UI가 안 나온다
+  A: pagination: true 설정이 반드시 있어야 한다.
+     paginationMode: "remote"만으로는 부족.
+
+  Q: 정렬이 안 된다
+  A: ajaxRequestFunc에서 params.sorters (O) vs params.sort (X) 확인.
+     Tabulator 6.x는 sorters 배열로 전달.
+
+  Q: 필터가 안 된다
+  A: ajaxRequestFunc에서 params.filters 확인.
+     서버에서 filter 쿼리파라미터를 JSON.parse 하는지 확인.

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.hyun.fnb.employee.EmployeeMapper">
+
+    <sql id="filterWhere">
+        <if test="filters != null and filters.size() > 0">
+            WHERE
+            <foreach collection="filters" item="f" separator=" AND ">
+                ${f.field} LIKE CONCAT('%', #{f.value}, '%')
+            </foreach>
+        </if>
+    </sql>
+
+    <select id="count" resultType="int">
+        SELECT COUNT(*) FROM employees
+        <include refid="filterWhere"/>
+    </select>
+
+    <select id="findPaginated" resultType="com.hyun.fnb.employee.Employee">
+        SELECT * FROM employees
+        <include refid="filterWhere"/>
+        ORDER BY ${sortCol} ${sortDir}
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+</mapper>
