@@ -42,6 +42,9 @@ export const Route = createRootRoute({
         <Link to="/grid-server" style={linkStyle}>
           서버사이드
         </Link>
+        <Link to="/grid-inline" style={linkStyle}>
+          인라인 편집
+        </Link>
       </nav>
       <main style={{ flex: 1, padding: "24px 32px", overflow: "auto" }}>
         <Outlet />
