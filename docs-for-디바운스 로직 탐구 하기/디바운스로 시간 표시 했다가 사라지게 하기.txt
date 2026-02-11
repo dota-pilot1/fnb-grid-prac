@@ -1,0 +1,222 @@
+========================================
+  디바운스로 시간 표시 했다가 사라지게 하기
+========================================
+
+  복잡해 보이는 코드를 단계별로 쪼개서 이해하기.
+  최종 코드를 한 번에 보면 어렵지만,
+  한 단계씩 쌓아가면 각각은 간단하다.
+
+
+========================================
+  Step 0. 가장 단순한 버전 (3줄)
+========================================
+
+  셀 편집 → 바로 서버 저장. 끝.
+
+  table.on("cellEdited", async (cell) => {
+    const data = cell.getRow().getData();
+    await saveRow(data);
+  });
+
+  문제점:
+  - 이름 수정 → API 호출
+  - 나이 수정 → API 호출
+  - 직책 수정 → API 호출
+  → 같은 행에서 3개 셀을 연속 수정하면 3번 호출됨.
+  → 비효율적.
+
+
+========================================
+  Step 1. 디바운스 추가 (연속 편집 → 1번만 저장)
+========================================
+
+  "마지막 편집 후 1초간 추가 편집이 없으면 저장"
+
+  const timerRef = useRef({});
+
+  table.on("cellEdited", (cell) => {
+    const data = cell.getRow().getData();
+
+    // 핵심: 이전 타이머가 있으면 취소
+    if (timerRef.current[data.id]) {
+      clearTimeout(timerRef.current[data.id]);
+    }
+
+    // 1초 뒤에 저장
+    timerRef.current[data.id] = setTimeout(async () => {
+      await saveRow(data);
+    }, 1000);
+  });
+
+  동작 원리:
+  ┌──────────────────────────────────────────┐
+  │ 0.0초  이름 수정 → 타이머A 생성 (1초 후 저장)  │
+  │ 0.3초  나이 수정 → 타이머A 취소, 타이머B 생성   │
+  │ 0.5초  직책 수정 → 타이머B 취소, 타이머C 생성   │
+  │ 1.5초  (1초 경과) → 타이머C 실행 → 저장 1번!  │
+  └──────────────────────────────────────────┘
+
+  clearTimeout이 핵심이다.
+  새 편집이 들어오면 이전 타이머를 취소하고 새로 시작.
+  결국 마지막 편집 기준 1초 후에만 저장된다.
+
+
+========================================
+  Step 2. "수정중" 표시 추가
+========================================
+
+  편집하면 바로 노란색으로 바꿔서 "아직 저장 안 됨"을 알려주기.
+
+  table.on("cellEdited", (cell) => {
+    const data = cell.getRow().getData();
+    const el = cell.getRow().getElement();
+
+    // ★ 추가: 노란 배경
+    el.style.background = "#fff8e1";
+
+    if (timerRef.current[data.id]) {
+      clearTimeout(timerRef.current[data.id]);
+    }
+
+    timerRef.current[data.id] = setTimeout(async () => {
+      await saveRow(data);
+      // ★ 추가: 저장 완료 → 배경 원래대로
+      el.style.background = "";
+    }, 1000);
+  });
+
+  이것만으로도 충분히 쓸만하다.
+  여기서 끝내도 됨.
+
+
+========================================
+  Step 3. "저장됨" 피드백 추가 (잠깐 초록 → 사라짐)
+========================================
+
+  저장 완료 후 "저장됐다"는 걸 잠깐 보여주고 싶다면?
+  → 초록색으로 바꿨다가 0.8초 후 원래대로.
+
+  timerRef.current[data.id] = setTimeout(async () => {
+    await saveRow(data);
+
+    // ★ 저장 완료 → 초록색
+    el.style.background = "#e8f5e9";
+
+    // ★ 0.8초 후 원래대로 (setTimeout 추가)
+    setTimeout(() => {
+      el.style.background = "";
+    }, 800);
+  }, 1000);
+
+  여기서 setTimeout이 2중이 된다.
+  - 바깥 setTimeout: 디바운스 (1초 대기 후 저장)
+  - 안쪽 setTimeout: 초록색 표시 후 되돌리기 (0.8초)
+
+  각각의 역할이 다르다. 두 개가 겹쳐서 복잡해 보이는 것.
+
+
+========================================
+  Step 4. 상태 컬럼 텍스트 추가 ("수정중" / "저장됨")
+========================================
+
+  색상만으로는 부족하고, 텍스트로도 알려주고 싶다면?
+  → 별도 "_status" 컬럼에 텍스트를 넣었다 뺐다.
+
+  table.on("cellEdited", (cell) => {
+    const data = cell.getRow().getData();
+    const el = cell.getRow().getElement();
+
+    el.style.background = "#fff8e1";
+
+    // ★ "수정중" 텍스트 표시
+    const statusCell = cell.getRow().getCell("_status");
+    statusCell.getElement().innerHTML =
+      '<span style="color:#ff9800">수정중</span>';
+
+    if (timerRef.current[data.id]) {
+      clearTimeout(timerRef.current[data.id]);
+    }
+
+    timerRef.current[data.id] = setTimeout(async () => {
+      await saveRow(data);
+
+      el.style.background = "#e8f5e9";
+
+      // ★ "저장됨" 텍스트 표시
+      const saved = tabulatorRef.current?.getRow(data.id)?.getCell("_status");
+      if (saved) {
+        saved.getElement().innerHTML =
+          '<span style="color:#4caf50">저장됨</span>';
+      }
+
+      setTimeout(() => {
+        el.style.background = "";
+        // ★ 텍스트도 제거
+        const cleared = tabulatorRef.current?.getRow(data.id)?.getCell("_status");
+        if (cleared) {
+          cleared.getElement().innerHTML = "";
+        }
+      }, 1500);
+
+      delete timerRef.current[data.id];
+    }, 1000);
+  });
+
+  이게 최종 코드다.
+  복잡해 보이지만 Step 0~4를 순서대로 쌓은 것뿐.
+
+
+========================================
+  정리: 각 Step이 추가하는 것
+========================================
+
+  | Step | 추가 내용           | 코드 증가량 | 필수 여부 |
+  |------|--------------------|-----------| --------|
+  | 0    | 즉시 저장            | 3줄       | 필수     |
+  | 1    | 디바운스             | +5줄      | 권장     |
+  | 2    | 노란색 배경 (수정중)   | +2줄      | 선택     |
+  | 3    | 초록색 → 사라짐       | +4줄      | 선택     |
+  | 4    | 텍스트 (수정중/저장됨) | +10줄     | 선택     |
+
+  Step 0만 해도 동작한다.
+  Step 1까지 하면 실용적이다.
+  Step 2~4는 UX 개선이고, 없어도 기능에 문제 없다.
+
+
+========================================
+  핵심 패턴: setTimeout 2중 구조
+========================================
+
+  setTimeout(() => {           // ← 디바운스 (1초)
+    저장();
+    색상 변경();
+    setTimeout(() => {         // ← 되돌리기 (0.8초)
+      색상 원래대로();
+    }, 800);
+  }, 1000);
+
+  바깥 = "언제 저장할까?"       → 1초 후
+  안쪽 = "언제 표시를 지울까?"   → 저장 후 0.8초 뒤
+
+  이 패턴만 이해하면 전체 코드가 읽힌다.
+
+
+========================================
+  디바운스를 안 쓰면? (비교)
+========================================
+
+  디바운스 없이 즉시 저장:
+  - 이름 수정 → PUT 호출
+  - 나이 수정 → PUT 호출
+  - 직책 수정 → PUT 호출
+  → 3번 요청
+
+  디바운스 있으면:
+  - 이름 수정 → (대기)
+  - 나이 수정 → (이전 취소, 대기)
+  - 직책 수정 → (이전 취소, 대기)
+  - 1초 후 → PUT 호출 1번
+  → 1번 요청
+
+  데이터 10건이면 차이 없지만,
+  대량 편집 시 서버 부하가 확 줄어든다.
