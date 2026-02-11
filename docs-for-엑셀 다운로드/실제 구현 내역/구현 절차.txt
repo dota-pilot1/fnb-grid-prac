@@ -3,19 +3,22 @@
 ========================================
 
   기존 서버사이드 페이지네이션 페이지(grid-server.tsx)에
-  엑셀 다운로드 기능을 추가한 과정을 절차별로 정리.
+  exceljs를 사용한 스타일 포함 엑셀 다운로드 기능을 추가한 과정.
 
 
 ========================================
-  Step 1. xlsx 패키지 설치
+  Step 1. 패키지 설치
 ========================================
 
   cd fnb-pilot-front
-  npm install xlsx
+  npm install exceljs file-saver
 
-  - xlsx (SheetJS): 자바스크립트에서 엑셀 파일을 생성/읽기하는 라이브러리
-  - Tabulator 내장 download("xlsx") 도 이 라이브러리를 사용함
+  - exceljs    : 엑셀 파일 생성/읽기 + 셀 스타일링(색상, 폰트, 테두리) 지원
+  - file-saver : 브라우저에서 Blob을 파일로 저장하는 유틸리티
   - 양쪽 프론트(Spring용, NestJS용) 모두 설치
+
+  ※ 처음에 xlsx(SheetJS)로 구현했으나, 무료 버전은 스타일링 미지원이라
+    exceljs로 전환함
 
 
 ========================================
@@ -24,10 +27,11 @@
 
   grid-server.tsx 상단에 추가:
 
-  import * as XLSX from "xlsx";
+  import ExcelJS from "exceljs";
+  import { saveAs } from "file-saver";
 
-  - 전체 다운로드(handleDownloadAll)에서 직접 워크북을 만들 때 사용
-  - 현재 페이지 다운로드는 Tabulator가 내부적으로 xlsx를 감지해서 사용
+  - ExcelJS: 워크북/시트 생성 및 스타일 적용
+  - saveAs: writeBuffer()로 생성한 Blob을 파일로 다운로드
 
 
 ========================================
@@ -39,15 +43,59 @@
     const res = await fetch(API_URL);
     const data = await res.json();
 
-    // 2) JSON → 엑셀 워크시트 변환
-    const ws = XLSX.utils.json_to_sheet(data);
+    // 2) 워크북 & 워크시트 생성
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("직원목록");
 
-    // 3) 빈 워크북 생성 후 시트 추가
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "직원목록");
+    // 3) 컬럼 정의 (헤더명 + 데이터 키 + 너비)
+    ws.columns = [
+      { header: "ID", key: "id", width: 8 },
+      { header: "이름", key: "name", width: 15 },
+      { header: "나이", key: "age", width: 8 },
+      { header: "직책", key: "position", width: 15 },
+    ];
 
-    // 4) 파일 다운로드 실행
-    XLSX.writeFile(wb, "employees.xlsx");
+    // 4) 데이터 행 추가
+    data.forEach((row) => ws.addRow(row));
+
+    // 5) 헤더 스타일 (초록 배경 + 흰색 볼드)
+    const headerRow = ws.getRow(1);
+    headerRow.eachCell((cell) => {
+      cell.fill = {
+        type: "pattern", pattern: "solid",
+        fgColor: { argb: "FF4CAF50" },
+      };
+      cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 12 };
+      cell.alignment = { horizontal: "center", vertical: "middle" };
+      cell.border = {
+        top: { style: "thin" }, bottom: { style: "thin" },
+        left: { style: "thin" }, right: { style: "thin" },
+      };
+    });
+    headerRow.height = 24;
+
+    // 6) 데이터 행 스타일 (테두리 + 짝수행 배경색)
+    for (let i = 2; i <= data.length + 1; i++) {
+      const row = ws.getRow(i);
+      row.eachCell((cell) => {
+        cell.border = {
+          top: { style: "thin" }, bottom: { style: "thin" },
+          left: { style: "thin" }, right: { style: "thin" },
+        };
+      });
+      if (i % 2 === 0) {
+        row.eachCell((cell) => {
+          cell.fill = {
+            type: "pattern", pattern: "solid",
+            fgColor: { argb: "FFF5F5F5" },
+          };
+        });
+      }
+    }
+
+    // 7) 파일 다운로드
+    const buffer = await wb.xlsx.writeBuffer();
+    saveAs(new Blob([buffer]), "employees.xlsx");
   };
 
   흐름 정리:
@@ -58,13 +106,18 @@
   │     ↓                                         │
   │ 서버 응답: [{id:1, name:"김민수", ...}, ...]     │
   │     ↓                                         │
-  │ XLSX.utils.json_to_sheet(data)                │
-  │     → 엑셀 시트 객체 생성                        │
+  │ new ExcelJS.Workbook()                        │
+  │ wb.addWorksheet("직원목록")                     │
   │     ↓                                         │
-  │ XLSX.utils.book_new() + book_append_sheet()   │
-  │     → 워크북에 시트 추가                         │
+  │ ws.columns = [ ... ]  ← 컬럼 정의              │
+  │ data.forEach(row => ws.addRow(row))           │
   │     ↓                                         │
-  │ XLSX.writeFile(wb, "employees.xlsx")          │
+  │ 헤더/데이터 행 스타일 적용                        │
+  │     ↓                                         │
+  │ wb.xlsx.writeBuffer()                         │
+  │     → ArrayBuffer 생성                         │
+  │     ↓                                         │
+  │ saveAs(new Blob([buffer]), "employees.xlsx")  │
   │     → 브라우저에서 파일 다운로드                   │
   └─────────────────────────────────────────────┘
 
@@ -76,35 +129,18 @@
 
 
 ========================================
-  Step 4. 현재 페이지 다운로드 함수
-========================================
-
-  const handleDownloadPage = () => {
-    tabulatorRef.current?.download("xlsx", "employees_page.xlsx", {
-      sheetName: "직원목록",
-    });
-  };
-
-  - Tabulator 내장 메서드 한 줄로 끝
-  - 현재 테이블에 렌더링된 데이터(20건)를 엑셀로 내보냄
-  - xlsx 패키지가 node_modules에 있으면 Tabulator가 자동 감지
-
-
-========================================
-  Step 5. JSX에 버튼 추가
+  Step 4. JSX에 버튼 추가
 ========================================
 
   <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
-    <button onClick={handleDownloadAll}>전체 엑셀 다운로드</button>
-    <button onClick={handleDownloadPage}>현재 페이지 다운로드</button>
+    <button onClick={handleDownloadAll}>엑셀 다운로드</button>
   </div>
 
   - 기존 그리드 위에 버튼 영역 추가
-  - flex + gap으로 버튼 간격 설정
 
 
 ========================================
-  Step 6. 백엔드 변경사항
+  Step 5. 백엔드 변경사항
 ========================================
 
   없음.
@@ -121,11 +157,11 @@
   최종 변경 파일 요약
 ========================================
 
-  | 파일                                          | 변경 내용              |
-  |----------------------------------------------|-----------------------|
-  | fnb-pilot-front/package.json                  | xlsx 의존성 추가        |
-  | fnb-pilot-front/src/routes/grid-server.tsx    | import + 함수 2개 + 버튼 |
-  | modern/fnb-pilot-front/package.json           | xlsx 의존성 추가        |
-  | modern/fnb-pilot-front/src/routes/grid-server.tsx | 동일 변경            |
+  | 파일                                              | 변경 내용                    |
+  |--------------------------------------------------|---------------------------|
+  | fnb-pilot-front/package.json                      | exceljs, file-saver 추가    |
+  | fnb-pilot-front/src/routes/grid-server.tsx        | import + 다운로드 함수 + 버튼  |
+  | modern/fnb-pilot-front/package.json               | exceljs, file-saver 추가    |
+  | modern/fnb-pilot-front/src/routes/grid-server.tsx | 동일 변경                    |
 
-  총 변경량: 패키지 설치 1줄 + 코드 약 20줄
+  총 변경량: 패키지 설치 1줄 + 코드 약 50줄 (스타일 포함)
