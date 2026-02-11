@@ -1,0 +1,170 @@
+========================================
+  useRef와 xxx.current의 의미
+========================================
+
+
+========================================
+  1. useRef란?
+========================================
+
+  React에서 "리렌더링 없이 값을 기억하는 상자".
+
+  const myRef = useRef(초기값);
+
+  이러면 myRef는 이런 객체가 된다:
+  { current: 초기값 }
+
+  이게 전부다. 그냥 { current: 값 } 객체일 뿐.
+
+
+========================================
+  2. .current란?
+========================================
+
+  useRef가 만든 상자 안의 실제 값.
+
+  const countRef = useRef(0);
+
+  countRef          → { current: 0 }     ← 상자
+  countRef.current  → 0                  ← 상자 안의 값
+
+  countRef.current = 5;
+
+  countRef          → { current: 5 }
+  countRef.current  → 5
+
+  .current에 직접 읽고 쓰면 된다.
+
+
+========================================
+  3. useState와 뭐가 다른가?
+========================================
+
+  const [count, setCount] = useState(0);
+  const countRef = useRef(0);
+
+  | 구분       | useState          | useRef              |
+  |-----------|-------------------|---------------------|
+  | 값 변경    | setCount(5)       | countRef.current = 5 |
+  | 리렌더링   | ✓ 발생             | ✗ 발생 안 함          |
+  | 화면 반영  | 화면이 다시 그려짐    | 화면 변화 없음         |
+  | 용도      | 화면에 보이는 값     | 내부에서만 쓰는 값      |
+
+  핵심 차이: useRef는 값이 바뀌어도 화면이 다시 그려지지 않는다.
+
+
+========================================
+  4. 왜 useRef를 쓰나? (let 변수와의 차이)
+========================================
+
+  "그냥 let 변수 쓰면 안 되나?"
+
+  let timer = null;        // ← 이거 안 됨
+
+  function MyComponent() {
+    // 리렌더링마다 이 함수가 다시 실행됨
+    // → let timer가 매번 null로 초기화됨!
+  }
+
+  useRef는 리렌더링해도 값이 유지된다.
+
+  function MyComponent() {
+    const timerRef = useRef(null);
+    // 리렌더링해도 timerRef.current는 이전 값 그대로
+  }
+
+  정리:
+  | 방식     | 리렌더링 시 값 유지 | 리렌더링 발생 |
+  |---------|------------------|-------------|
+  | let     | ✗ 초기화됨         | -           |
+  | useState| ✓ 유지            | ✓ 발생       |
+  | useRef  | ✓ 유지            | ✗ 발생 안 함  |
+
+
+========================================
+  5. 실제 사용 예시 — 우리 코드에서
+========================================
+
+  ■ 예시 1: DOM 요소 참조
+
+  const tableRef = useRef<HTMLDivElement>(null);
+
+  tableRef.current → 실제 <div> DOM 요소
+  → Tabulator를 이 div에 붙이기 위해 사용
+
+  <div ref={tableRef} />
+  → React가 렌더링 후 tableRef.current에 이 div를 자동으로 넣어줌
+
+
+  ■ 예시 2: Tabulator 인스턴스 보관
+
+  const tabulatorRef = useRef<Tabulator | null>(null);
+
+  useEffect(() => {
+    const table = new Tabulator(...);
+    tabulatorRef.current = table;   // ← 인스턴스 저장
+  }, []);
+
+  // 나중에 어디서든
+  tabulatorRef.current?.getRow(5);  // ← 꺼내 쓰기
+
+  왜 useState 안 쓰나?
+  → Tabulator 인스턴스를 저장할 때 리렌더링이 필요 없으니까.
+  → useState로 하면 불필요한 리렌더링 발생.
+
+
+  ■ 예시 3: 타이머 ID 보관 (디바운스)
+
+  const timerRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
+
+  이걸 풀어쓰면:
+  timerRef.current = {
+    5: 타이머ID,     // ID=5인 행의 디바운스 타이머
+    12: 타이머ID,    // ID=12인 행의 디바운스 타이머
+  }
+
+  왜 useRef?
+  → 타이머 ID는 화면에 안 보임. 내부 관리용.
+  → 리렌더링과 관계없이 유지되어야 함.
+  → clearTimeout(timerRef.current[5]) 로 취소 가능.
+
+
+  ■ 예시 4: 수정 중인 행 ID 추적
+
+  const pendingRef = useRef<Set<number>>(new Set());
+
+  pendingRef.current.add(5);      // ID=5 수정 중
+  pendingRef.current.delete(5);   // ID=5 저장 완료
+  pendingRef.current.has(5);      // ID=5가 수정 중인지 확인
+
+
+========================================
+  6. .current 읽는 법 요약
+========================================
+
+  코드를 보면:
+    timerRef.current[data.id]
+
+  이건:
+    timerRef          → useRef가 만든 상자
+    .current          → 상자 안의 값 (여기서는 {} 객체)
+    [data.id]         → 그 객체에서 특정 행의 타이머 꺼내기
+
+  tabulatorRef.current?.getRow(data.id)
+
+  이건:
+    tabulatorRef      → useRef가 만든 상자
+    .current          → Tabulator 인스턴스 (또는 null)
+    ?.                → null이면 멈춤 (옵셔널 체이닝)
+    getRow(data.id)   → Tabulator 메서드 호출
+
+
+========================================
+  7. 한 줄 정리
+========================================
+
+  useRef = "리렌더링 없이 값을 기억하는 상자"
+  .current = "그 상자 안의 실제 값"
+
+  화면에 보여줄 값 → useState
+  내부에서만 쓸 값 → useRef
