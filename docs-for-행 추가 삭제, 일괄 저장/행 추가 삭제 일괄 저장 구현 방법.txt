@@ -1,0 +1,187 @@
+========================================
+  행 추가/삭제 + 일괄 저장
+========================================
+
+■ 개요
+  그리드에서 행 추가, 셀 편집, 체크박스 선택 후 삭제를 한 뒤,
+  "일괄 저장" 버튼 하나로 변경분을 모아서 서버에 한 번에 전송.
+  인라인 편집(자동 저장)과 달리, 사용자가 저장 시점을 직접 결정.
+
+
+========================================
+  1. 인라인 저장 vs 일괄 저장
+========================================
+
+  | 구분       | 인라인 저장 (grid-inline)  | 일괄 저장 (grid-batch)    |
+  |-----------|-------------------------|-------------------------|
+  | 저장 시점  | 셀 편집 후 자동 (1초 뒤)    | 사용자가 버튼 클릭 시       |
+  | API 호출   | 셀 편집마다 PUT 1건        | 버튼 1번 → POST batch 1건 |
+  | 행 추가    | ✗ (편집만)               | ✓ 가능                   |
+  | 행 삭제    | ✗ (편집만)               | ✓ 가능 (체크박스 선택)      |
+  | 되돌리기   | 불가 (바로 저장됨)         | 저장 전까지 취소 가능       |
+  | 적합한 상황 | 소량 수정, 즉시 반영 필요   | 대량 편집, 검토 후 저장     |
+
+
+========================================
+  2. 핵심 설계: 변경 추적 (Change Tracking)
+========================================
+
+  3가지 Map/Set으로 변경사항을 추적한다.
+
+  const createdRef = useRef<Map<number, Row>>(new Map());
+  const updatedRef = useRef<Map<number, Row>>(new Map());
+  const deletedRef = useRef<Set<number>>(new Set());
+
+  ■ createdRef — 새로 추가된 행
+    - 임시 ID(음수)를 키로 사용: -1, -2, -3 ...
+    - 아직 서버에 없는 행이므로 음수 ID로 구분
+    - 저장 시 id를 빼고 { name, age, position }만 전송
+
+  ■ updatedRef — 수정된 기존 행
+    - 실제 DB ID를 키로 사용: 1, 5, 23 ...
+    - 서버에 이미 있는 행을 수정한 경우
+
+  ■ deletedRef — 삭제할 행의 ID
+    - 실제 DB ID만 담음
+    - 새 행(음수 ID)은 서버에 없으니 created에서 빼면 끝
+
+
+========================================
+  3. 행 추가 로직
+========================================
+
+  let tempIdSeq = -1;
+
+  const handleAdd = () => {
+    const id = tempIdSeq--;    // -1, -2, -3 ...
+    const newRow = { id, name: "", age: 20, position: "" };
+    createdRef.current.set(id, newRow);
+    tabulatorRef.current?.addRow(newRow, true);  // true = 맨 위에 추가
+  };
+
+  왜 음수 ID?
+  → 기존 행(양수 ID)과 충돌 방지
+  → ID 컬럼에서 음수면 "NEW" 라벨 표시
+  → 서버 전송 시 id를 제외하고 보내면 DB가 자동 채번
+
+
+========================================
+  4. 행 삭제 로직
+========================================
+
+  const handleDelete = () => {
+    const selected = tabulatorRef.current?.getSelectedRows();
+
+    for (const row of selected) {
+      const data = row.getData();
+
+      if (data.id < 0) {
+        // 새 행 → created에서 제거 (서버에 안 보냄)
+        createdRef.current.delete(data.id);
+      } else {
+        // 기존 행 → deleted에 추가 + updated에서 제거
+        deletedRef.current.add(data.id);
+        updatedRef.current.delete(data.id);
+      }
+
+      row.delete();  // 테이블에서 행 제거 (화면에서만)
+    }
+  };
+
+  ■ 체크박스 선택: selectableRows: true + rowSelection 컬럼
+  ■ getSelectedRows() → 선택된 행 배열 반환
+
+
+========================================
+  5. 셀 편집 시 변경 추적
+========================================
+
+  table.on("cellEdited", (cell) => {
+    const data = cell.getRow().getData();
+
+    if (data.id < 0) {
+      createdRef.current.set(data.id, data);   // 새 행 갱신
+    } else {
+      updatedRef.current.set(data.id, data);   // 기존 행 수정 추적
+    }
+  });
+
+  새 행을 추가한 뒤 셀을 편집하면 created가 갱신됨.
+  기존 행을 편집하면 updated에 쌓임.
+
+
+========================================
+  6. 일괄 저장 (batch API)
+========================================
+
+  const handleSave = async () => {
+    const created = Array.from(createdRef.current.values())
+      .map(({ name, age, position }) => ({ name, age, position }));
+    const updated = Array.from(updatedRef.current.values());
+    const deletedIds = Array.from(deletedRef.current);
+
+    await fetch(`${API_URL}/batch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ created, updated, deletedIds }),
+    });
+
+    // 추적 초기화 + 테이블 새로고침
+    createdRef.current.clear();
+    updatedRef.current.clear();
+    deletedRef.current.clear();
+    tabulatorRef.current?.setData(API_URL + "?page=1&size=20");
+  };
+
+  서버로 보내는 JSON:
+  {
+    "created":    [{ name: "김철수", age: 30, position: "사원" }],
+    "updated":    [{ id: 5, name: "이영희", age: 28, position: "대리" }],
+    "deletedIds": [12, 45]
+  }
+
+  → 서버가 한 트랜잭션 안에서 삭제 → 수정 → 추가 순으로 처리
+
+
+========================================
+  7. 시각적 피드백
+========================================
+
+  | 상태       | 행 배경색   | ID 컬럼  |
+  |-----------|-----------|---------|
+  | 새 행      | #e3f2fd   | NEW     |
+  | 수정된 행  | #fff8e1   | 원래 ID  |
+  | 일반 행    | (기본)     | 원래 ID  |
+
+  저장 버튼:
+  - 변경 없으면 회색(disabled)
+  - 변경 있으면 초록색 + 변경 건수 표시
+
+
+========================================
+  8. 백엔드 변경사항
+========================================
+
+  없음.
+
+  기존 POST /api/employees/batch API를 그대로 사용.
+
+  Spring:  EmployeeController.batch() → EmployeeService.batch()
+  NestJS:  EmployeesController.batch() → EmployeesService.batch()
+
+  둘 다 { created, updated, deletedIds }를 받아서
+  @Transactional 안에서 삭제 → 수정 → 추가 처리.
+
+
+========================================
+  9. 변경 파일 요약
+========================================
+
+  | 파일                                              | 변경 내용          |
+  |--------------------------------------------------|--------------------|
+  | fnb-pilot-front/src/routes/grid-batch.tsx         | 새 페이지 추가      |
+  | fnb-pilot-front/src/routes/__root.tsx             | 네비 링크 추가      |
+  | modern/fnb-pilot-front/src/routes/grid-batch.tsx  | 새 페이지 추가      |
+  | modern/fnb-pilot-front/src/routes/__root.tsx      | 네비 링크 추가      |
+
+  백엔드 변경: 0줄 (기존 batch API 사용)

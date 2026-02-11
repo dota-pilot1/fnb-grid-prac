@@ -13,6 +13,7 @@ import { Route as GridUpdateRouteImport } from './routes/grid-update'
 import { Route as GridServerRouteImport } from './routes/grid-server'
 import { Route as GridSaveRouteImport } from './routes/grid-save'
 import { Route as GridInlineRouteImport } from './routes/grid-inline'
+import { Route as GridBatchRouteImport } from './routes/grid-batch'
 import { Route as GridApiRouteImport } from './routes/grid-api'
 import { Route as GridAddDeleteRouteImport } from './routes/grid-add-delete'
 import { Route as GridRouteImport } from './routes/grid'
@@ -36,6 +37,11 @@ const GridSaveRoute = GridSaveRouteImport.update({
 const GridInlineRoute = GridInlineRouteImport.update({
   id: '/grid-inline',
   path: '/grid-inline',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GridBatchRoute = GridBatchRouteImport.update({
+  id: '/grid-batch',
+  path: '/grid-batch',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GridApiRoute = GridApiRouteImport.update({
@@ -64,6 +70,7 @@ export interface FileRoutesByFullPath {
   '/grid': typeof GridRoute
   '/grid-add-delete': typeof GridAddDeleteRoute
   '/grid-api': typeof GridApiRoute
+  '/grid-batch': typeof GridBatchRoute
   '/grid-inline': typeof GridInlineRoute
   '/grid-save': typeof GridSaveRoute
   '/grid-server': typeof GridServerRoute
@@ -74,6 +81,7 @@ export interface FileRoutesByTo {
   '/grid': typeof GridRoute
   '/grid-add-delete': typeof GridAddDeleteRoute
   '/grid-api': typeof GridApiRoute
+  '/grid-batch': typeof GridBatchRoute
   '/grid-inline': typeof GridInlineRoute
   '/grid-save': typeof GridSaveRoute
   '/grid-server': typeof GridServerRoute
@@ -85,6 +93,7 @@ export interface FileRoutesById {
   '/grid': typeof GridRoute
   '/grid-add-delete': typeof GridAddDeleteRoute
   '/grid-api': typeof GridApiRoute
+  '/grid-batch': typeof GridBatchRoute
   '/grid-inline': typeof GridInlineRoute
   '/grid-save': typeof GridSaveRoute
   '/grid-server': typeof GridServerRoute
@@ -97,6 +106,7 @@ export interface FileRouteTypes {
     | '/grid'
     | '/grid-add-delete'
     | '/grid-api'
+    | '/grid-batch'
     | '/grid-inline'
     | '/grid-save'
     | '/grid-server'
@@ -107,6 +117,7 @@ export interface FileRouteTypes {
     | '/grid'
     | '/grid-add-delete'
     | '/grid-api'
+    | '/grid-batch'
     | '/grid-inline'
     | '/grid-save'
     | '/grid-server'
@@ -117,6 +128,7 @@ export interface FileRouteTypes {
     | '/grid'
     | '/grid-add-delete'
     | '/grid-api'
+    | '/grid-batch'
     | '/grid-inline'
     | '/grid-save'
     | '/grid-server'
@@ -128,6 +140,7 @@ export interface RootRouteChildren {
   GridRoute: typeof GridRoute
   GridAddDeleteRoute: typeof GridAddDeleteRoute
   GridApiRoute: typeof GridApiRoute
+  GridBatchRoute: typeof GridBatchRoute
   GridInlineRoute: typeof GridInlineRoute
   GridSaveRoute: typeof GridSaveRoute
   GridServerRoute: typeof GridServerRoute
@@ -162,6 +175,13 @@ declare module '@tanstack/react-router' {
       path: '/grid-inline'
       fullPath: '/grid-inline'
       preLoaderRoute: typeof GridInlineRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/grid-batch': {
+      id: '/grid-batch'
+      path: '/grid-batch'
+      fullPath: '/grid-batch'
+      preLoaderRoute: typeof GridBatchRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/grid-api': {
@@ -200,6 +220,7 @@ const rootRouteChildren: RootRouteChildren = {
   GridRoute: GridRoute,
   GridAddDeleteRoute: GridAddDeleteRoute,
   GridApiRoute: GridApiRoute,
+  GridBatchRoute: GridBatchRoute,
   GridInlineRoute: GridInlineRoute,
   GridSaveRoute: GridSaveRoute,
   GridServerRoute: GridServerRoute,
