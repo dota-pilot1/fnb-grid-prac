@@ -2,6 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 import { TabulatorFull as Tabulator } from "tabulator-tables";
 import "tabulator-tables/dist/css/tabulator.min.css";
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
 
 const API_URL = "http://localhost:8080/api/employees";
 
@@ -32,13 +34,11 @@ function GridServerPage() {
         query.set("page", String(params.page || 1));
         query.set("size", String(params.size || 20));
 
-        // 정렬 (Tabulator는 sorters 배열로 전달)
         if (params.sorters && params.sorters.length > 0) {
           query.set("sort", params.sorters[0].field);
           query.set("dir", params.sorters[0].dir);
         }
 
-        // 필터
         if (params.filters && params.filters.length > 0) {
           const filters = params.filters.map(
             (f: { field: string; value: string }) => ({
@@ -88,6 +88,76 @@ function GridServerPage() {
     };
   }, []);
 
+  // 전체 데이터 엑셀 다운로드 (exceljs)
+  const handleDownloadAll = async () => {
+    const res = await fetch(API_URL);
+    const data = await res.json();
+
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("직원목록");
+
+    // 컬럼 정의 (헤더 + 너비)
+    ws.columns = [
+      { header: "ID", key: "id", width: 8 },
+      { header: "이름", key: "name", width: 15 },
+      { header: "나이", key: "age", width: 8 },
+      { header: "직책", key: "position", width: 15 },
+    ];
+
+    // 데이터 추가
+    data.forEach(
+      (row: { id: number; name: string; age: number; position: string }) => {
+        ws.addRow(row);
+      },
+    );
+
+    // 헤더 스타일
+    const headerRow = ws.getRow(1);
+    headerRow.eachCell((cell) => {
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FF4CAF50" },
+      };
+      cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 12 };
+      cell.alignment = { horizontal: "center", vertical: "middle" };
+      cell.border = {
+        top: { style: "thin" },
+        bottom: { style: "thin" },
+        left: { style: "thin" },
+        right: { style: "thin" },
+      };
+    });
+    headerRow.height = 24;
+
+    // 데이터 행 스타일
+    for (let i = 2; i <= data.length + 1; i++) {
+      const row = ws.getRow(i);
+      row.eachCell((cell) => {
+        cell.border = {
+          top: { style: "thin" },
+          bottom: { style: "thin" },
+          left: { style: "thin" },
+          right: { style: "thin" },
+        };
+      });
+      // 짝수 행 배경색
+      if (i % 2 === 0) {
+        row.eachCell((cell) => {
+          cell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: "FFF5F5F5" },
+          };
+        });
+      }
+    }
+
+    // 다운로드
+    const buffer = await wb.xlsx.writeBuffer();
+    saveAs(new Blob([buffer]), "employees.xlsx");
+  };
+
   return (
     <div>
       <h1>서버사이드 페이지네이션</h1>
@@ -95,6 +165,9 @@ function GridServerPage() {
       <p style={{ fontSize: "13px", color: "#888" }}>
         컬럼 헤더 클릭으로 정렬, 헤더 아래 입력란으로 필터링
       </p>
+      <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
+        <button onClick={handleDownloadAll}>엑셀 다운로드</button>
+      </div>
       <div ref={tableRef} />
     </div>
   );

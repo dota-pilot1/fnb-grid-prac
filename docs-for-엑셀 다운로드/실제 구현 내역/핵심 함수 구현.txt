@@ -1,0 +1,110 @@
+  const handleDownloadAll = async () => {
+    // 1) 서버에서 전체 데이터 조회 (page 파라미터 없이 호출)
+    const res = await fetch(API_URL);
+    const data = await res.json();
+
+    // 2) JSON → 엑셀 워크시트 변환
+    const ws = XLSX.utils.json_to_sheet(data);
+
+    // 3) 빈 워크북 생성 후 시트 추가
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "직원목록");
+
+    // 4) 파일 다운로드 실행
+    XLSX.writeFile(wb, "employees.xlsx");
+  };
+
+
+========================================
+  엑셀 컬럼 커스텀 설정 방법
+========================================
+
+  기본 동작: json_to_sheet(data)는 JSON 키를 그대로 헤더로 사용한다.
+  → id, name, age, position (영문 그대로)
+
+  컬럼을 커스텀하고 싶으면 아래 방법들을 사용한다.
+
+
+■ 방법 1. 헤더만 한글로 바꾸기 (가장 간단)
+
+  const ws = XLSX.utils.json_to_sheet(data);
+
+  // 헤더 셀을 직접 덮어쓰기
+  ws["A1"].v = "ID";
+  ws["B1"].v = "이름";
+  ws["C1"].v = "나이";
+  ws["D1"].v = "직책";
+
+  → 데이터는 그대로, 1행 헤더만 한글로 변경
+
+
+■ 방법 2. 특정 컬럼만 선택해서 내보내기
+
+  // data에서 원하는 필드만 추출
+  const filtered = data.map(d => ({
+    이름: d.name,
+    나이: d.age,
+    직책: d.position,
+  }));
+  const ws = XLSX.utils.json_to_sheet(filtered);
+
+  → id 제외, 한글 헤더로 3개 컬럼만 내보냄
+  → map으로 새 객체를 만들면 키가 곧 헤더가 됨
+
+
+■ 방법 3. 컬럼 순서 지정
+
+  const ws = XLSX.utils.json_to_sheet(data, {
+    header: ["name", "position", "age", "id"],  // 원하는 순서
+  });
+
+  → header 배열 순서대로 컬럼이 배치됨
+  → 기본은 JSON 키 순서를 따름
+
+
+■ 방법 4. 컬럼 너비 설정
+
+  const ws = XLSX.utils.json_to_sheet(data);
+  ws["!cols"] = [
+    { wch: 5 },    // A열(id) 너비 5
+    { wch: 15 },   // B열(name) 너비 15
+    { wch: 8 },    // C열(age) 너비 8
+    { wch: 15 },   // D열(position) 너비 15
+  ];
+
+  → wch = 글자 수 기준 너비
+
+
+■ 방법 5. 방법 1~4 조합 (실무 추천)
+
+  // 한글 헤더 + 원하는 컬럼만 + 순서 지정 + 너비
+  const excelData = data.map(d => ({
+    "ID": d.id,
+    "이름": d.name,
+    "나이": d.age,
+    "직책": d.position,
+  }));
+  const ws = XLSX.utils.json_to_sheet(excelData);
+  ws["!cols"] = [
+    { wch: 5 },
+    { wch: 15 },
+    { wch: 8 },
+    { wch: 15 },
+  ];
+
+  → map으로 키를 한글로 바꾸면 헤더도 한글
+  → 필요 없는 필드는 map에서 빼면 됨
+  → 이 패턴이 가장 깔끔하고 실무에서 많이 씀
+
+
+========================================
+  정리
+========================================
+
+  | 하고 싶은 것       | 방법                              |
+  |-------------------|----------------------------------|
+  | 헤더 한글로        | ws["A1"].v 직접 수정 또는 map으로 키 변경 |
+  | 특정 컬럼만        | map으로 원하는 필드만 추출             |
+  | 컬럼 순서 변경     | header 옵션 또는 map 순서로 제어       |
+  | 컬럼 너비 설정     | ws["!cols"] 배열                    |
+  | 컬럼 제외          | map에서 해당 필드 안 넣으면 됨          |
