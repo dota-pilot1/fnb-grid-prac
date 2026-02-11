@@ -48,6 +48,9 @@ export const Route = createRootRoute({
         <Link to="/grid-batch" style={linkStyle}>
           일괄 저장
         </Link>
+        <Link to="/grid-validate" style={linkStyle}>
+          유효성 검사
+        </Link>
       </nav>
       <main style={{ flex: 1, padding: "24px 32px", overflow: "auto" }}>
         <Outlet />

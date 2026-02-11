@@ -1,0 +1,188 @@
+========================================
+  Tabulator 셀 유효성 검사
+========================================
+
+■ 개요
+  셀 편집 시 값이 유효한지 자동 검사.
+  실패하면 빨간 테두리로 표시, 통과하면 서버 저장.
+  Tabulator 내장 validator를 사용하므로 구현이 간단.
+
+
+========================================
+  1. 핵심: validator 속성
+========================================
+
+  컬럼 정의에 validator를 추가하면 끝.
+
+  columns: [
+    {
+      title: "이름",
+      field: "name",
+      editor: "input",
+      validator: ["required", { type: "minLength", parameters: 2 }],
+    },
+  ]
+
+  → 빈값이면 실패, 2자 미만이면 실패.
+
+
+========================================
+  2. 내장 validator 종류
+========================================
+
+  | validator      | 설명                   | 예시                                    |
+  |---------------|------------------------|----------------------------------------|
+  | required      | 빈값 불가               | validator: ["required"]                 |
+  | minLength     | 최소 글자 수            | { type: "minLength", parameters: 2 }    |
+  | maxLength     | 최대 글자 수            | { type: "maxLength", parameters: 20 }   |
+  | min           | 최솟값 (숫자)           | { type: "min", parameters: 1 }          |
+  | max           | 최댓값 (숫자)           | { type: "max", parameters: 120 }        |
+  | integer       | 정수만 허용             | { type: "integer" }                     |
+  | numeric       | 숫자만 허용             | { type: "numeric" }                     |
+  | string        | 문자열만 허용           | { type: "string" }                      |
+  | regex         | 정규식 매칭             | { type: "regex", parameters: /^[가-힣]+$/ } |
+  | unique        | 컬럼 내 중복 불가        | { type: "unique" }                      |
+
+  여러 개 조합 가능:
+  validator: [
+    { type: "required" },
+    { type: "min", parameters: 1 },
+    { type: "max", parameters: 120 },
+    { type: "integer" },
+  ]
+
+
+========================================
+  3. validationMode 옵션
+========================================
+
+  테이블 설정에서 유효성 실패 시 동작을 지정:
+
+  | 모드          | 동작                                    |
+  |--------------|----------------------------------------|
+  | "blocking"   | 유효성 실패 시 편집 취소 (값이 원래대로)      |
+  | "highlight"  | 셀에 빨간 표시만 하고 값은 유지              |
+  | "manual"     | 아무 동작 안 함 (직접 row.validate() 호출)  |
+
+  우리 구현: validationMode: "highlight"
+  → 실패해도 값은 유지되고, 빨간 테두리로 시각적 알림만.
+
+
+========================================
+  4. 커스텀 validator (직접 만들기)
+========================================
+
+  내장 validator로 부족할 때:
+
+  validator: [
+    {
+      type: (cell, value) => {
+        // true 반환 = 통과, false 반환 = 실패
+        if (value.includes("  ")) return false;  // 연속 공백 불가
+        return true;
+      },
+    },
+  ]
+
+  예시: 이메일 형식 검사
+  validator: [
+    {
+      type: (cell, value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value),
+    },
+  ]
+
+
+========================================
+  5. editor: "list" (드롭다운 선택)
+========================================
+
+  직책처럼 정해진 값만 입력받고 싶을 때:
+
+  {
+    title: "직책",
+    field: "position",
+    editor: "list",
+    editorParams: {
+      values: ["사원", "대리", "과장", "차장", "부장"],
+      autocomplete: true,    // 타이핑으로 필터링
+      listOnEmpty: true,     // 빈 상태에서도 목록 표시
+    },
+    validator: ["required"],
+  }
+
+  editor: "list" + validator: "required" 조합으로
+  "반드시 목록 중 하나를 선택"을 강제할 수 있다.
+
+
+========================================
+  6. row.validate()로 수동 검사
+========================================
+
+  cellEdited 이벤트 안에서 행 전체를 검사:
+
+  table.on("cellEdited", async (cell) => {
+    const row = cell.getRow();
+    const valid = row.validate();
+
+    if (valid === true) {
+      // 모든 셀 통과 → 서버 저장
+      await saveRow(row.getData());
+    } else {
+      // 하나라도 실패 → 저장 안 함
+      // valid는 실패한 셀 정보 배열
+    }
+  });
+
+  valid === true  → 통과
+  valid === Array → 실패한 셀 배열 (어떤 셀이 실패했는지 알 수 있음)
+
+
+========================================
+  7. 실패 시 스타일 커스텀
+========================================
+
+  Tabulator가 실패한 셀에 .tabulator-validation-fail 클래스를 추가.
+  CSS로 커스텀:
+
+  .tabulator-row .tabulator-validation-fail {
+    background: #ffebee !important;
+    border: 2px solid #f44336 !important;
+  }
+
+
+========================================
+  8. 우리 구현에서 적용한 규칙
+========================================
+
+  | 컬럼  | 규칙                          | editor   |
+  |------|-------------------------------|----------|
+  | ID   | 편집 불가 (editor 없음)         | -        |
+  | 이름  | 필수, 2~20자                   | input    |
+  | 나이  | 필수, 정수, 1~120              | number   |
+  | 직책  | 필수, 목록에서 선택              | list     |
+
+
+========================================
+  9. 백엔드 변경사항
+========================================
+
+  없음.
+  기존 PUT /api/employees/{id} 그대로 사용.
+  프론트에서 유효성 통과한 것만 서버로 보냄.
+
+  ※ 실무에서는 백엔드에서도 유효성 검사를 해야 한다.
+     프론트 검사는 UX용, 백엔드 검사가 실제 안전장치.
+
+
+========================================
+  10. 변경 파일 요약
+========================================
+
+  | 파일                                                | 변경 내용          |
+  |----------------------------------------------------|--------------------|
+  | fnb-pilot-front/src/routes/grid-validate.tsx        | 새 페이지 추가      |
+  | fnb-pilot-front/src/routes/__root.tsx               | 네비 링크 추가      |
+  | modern/fnb-pilot-front/src/routes/grid-validate.tsx | 새 페이지 추가      |
+  | modern/fnb-pilot-front/src/routes/__root.tsx        | 네비 링크 추가      |
+
+  백엔드 변경: 0줄

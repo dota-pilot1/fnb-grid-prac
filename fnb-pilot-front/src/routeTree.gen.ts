@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as GridValidateRouteImport } from './routes/grid-validate'
 import { Route as GridUpdateRouteImport } from './routes/grid-update'
 import { Route as GridServerRouteImport } from './routes/grid-server'
 import { Route as GridSaveRouteImport } from './routes/grid-save'
@@ -19,6 +20,11 @@ import { Route as GridAddDeleteRouteImport } from './routes/grid-add-delete'
 import { Route as GridRouteImport } from './routes/grid'
 import { Route as IndexRouteImport } from './routes/index'
 
+const GridValidateRoute = GridValidateRouteImport.update({
+  id: '/grid-validate',
+  path: '/grid-validate',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GridUpdateRoute = GridUpdateRouteImport.update({
   id: '/grid-update',
   path: '/grid-update',
@@ -75,6 +81,7 @@ export interface FileRoutesByFullPath {
   '/grid-save': typeof GridSaveRoute
   '/grid-server': typeof GridServerRoute
   '/grid-update': typeof GridUpdateRoute
+  '/grid-validate': typeof GridValidateRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -86,6 +93,7 @@ export interface FileRoutesByTo {
   '/grid-save': typeof GridSaveRoute
   '/grid-server': typeof GridServerRoute
   '/grid-update': typeof GridUpdateRoute
+  '/grid-validate': typeof GridValidateRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -98,6 +106,7 @@ export interface FileRoutesById {
   '/grid-save': typeof GridSaveRoute
   '/grid-server': typeof GridServerRoute
   '/grid-update': typeof GridUpdateRoute
+  '/grid-validate': typeof GridValidateRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -111,6 +120,7 @@ export interface FileRouteTypes {
     | '/grid-save'
     | '/grid-server'
     | '/grid-update'
+    | '/grid-validate'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -122,6 +132,7 @@ export interface FileRouteTypes {
     | '/grid-save'
     | '/grid-server'
     | '/grid-update'
+    | '/grid-validate'
   id:
     | '__root__'
     | '/'
@@ -133,6 +144,7 @@ export interface FileRouteTypes {
     | '/grid-save'
     | '/grid-server'
     | '/grid-update'
+    | '/grid-validate'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -145,10 +157,18 @@ export interface RootRouteChildren {
   GridSaveRoute: typeof GridSaveRoute
   GridServerRoute: typeof GridServerRoute
   GridUpdateRoute: typeof GridUpdateRoute
+  GridValidateRoute: typeof GridValidateRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/grid-validate': {
+      id: '/grid-validate'
+      path: '/grid-validate'
+      fullPath: '/grid-validate'
+      preLoaderRoute: typeof GridValidateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/grid-update': {
       id: '/grid-update'
       path: '/grid-update'
@@ -225,6 +245,7 @@ const rootRouteChildren: RootRouteChildren = {
   GridSaveRoute: GridSaveRoute,
   GridServerRoute: GridServerRoute,
   GridUpdateRoute: GridUpdateRoute,
+  GridValidateRoute: GridValidateRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
