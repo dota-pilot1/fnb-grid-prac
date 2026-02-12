@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { TabulatorFull as Tabulator } from "tabulator-tables";
 import "tabulator-tables/dist/css/tabulator.min.css";
 
@@ -21,6 +21,9 @@ const positionColor: Record<string, { bg: string; text: string }> = {
 
 function GridFormatterPage() {
   const tableRef = useRef<HTMLDivElement>(null);
+  const tabulatorRef = useRef<Tabulator | null>(null);
+  const [searchName, setSearchName] = useState("");
+  const [searchPosition, setSearchPosition] = useState("");
 
   useEffect(() => {
     if (!tableRef.current) return;
@@ -76,7 +79,6 @@ function GridFormatterPage() {
           title: "이름",
           field: "name",
           headerSort: true,
-          headerFilter: "input" as const,
           formatter: (cell) => {
             const name = cell.getValue() as string;
             const initial = name ? name.charAt(0) : "?";
@@ -111,7 +113,6 @@ function GridFormatterPage() {
           width: 120,
           hozAlign: "center",
           headerSort: true,
-          headerFilter: "input" as const,
           formatter: (cell) => {
             const pos = cell.getValue() as string;
             const c = positionColor[pos] || { bg: "#eee", text: "#333" };
@@ -136,10 +137,35 @@ function GridFormatterPage() {
       ],
     });
 
+    tabulatorRef.current = table;
+
     return () => {
       table.destroy();
     };
   }, []);
+
+  const handleSearch = () => {
+    const filters: { field: string; type: string; value: string }[] = [];
+    if (searchName.trim()) {
+      filters.push({ field: "name", type: "like", value: searchName.trim() });
+    }
+    if (searchPosition.trim()) {
+      filters.push({
+        field: "position",
+        type: "like",
+        value: searchPosition.trim(),
+      });
+    }
+    if (filters.length > 0) {
+      tabulatorRef.current?.setFilter(filters);
+    }
+  };
+
+  const handleClear = () => {
+    setSearchName("");
+    setSearchPosition("");
+    tabulatorRef.current?.clearFilter();
+  };
 
   return (
     <div>
@@ -168,6 +194,47 @@ function GridFormatterPage() {
         <div>
           <b>등급</b>: 나이 기반 별점 (★~★★★)
         </div>
+      </div>
+      <div
+        style={{
+          display: "flex",
+          gap: "8px",
+          marginBottom: "12px",
+          alignItems: "center",
+        }}
+      >
+        <input
+          type="text"
+          placeholder="이름 검색"
+          value={searchName}
+          onChange={(e) => setSearchName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleSearch();
+          }}
+          style={{
+            padding: "6px 10px",
+            border: "1px solid #ccc",
+            borderRadius: "4px",
+            width: "140px",
+          }}
+        />
+        <input
+          type="text"
+          placeholder="직책 검색"
+          value={searchPosition}
+          onChange={(e) => setSearchPosition(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleSearch();
+          }}
+          style={{
+            padding: "6px 10px",
+            border: "1px solid #ccc",
+            borderRadius: "4px",
+            width: "140px",
+          }}
+        />
+        <button onClick={handleSearch}>검색</button>
+        <button onClick={handleClear}>초기화</button>
       </div>
       <div ref={tableRef} />
     </div>
