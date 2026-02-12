@@ -144,7 +144,7 @@ function GridFormatterPage() {
     };
   }, []);
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
     const filters: { field: string; value: string }[] = [];
     if (searchName.trim()) {
       filters.push({ field: "name", value: searchName.trim() });
@@ -158,13 +158,17 @@ function GridFormatterPage() {
     if (filters.length > 0) {
       query.set("filter", JSON.stringify(filters));
     }
-    tabulatorRef.current?.setData(`${API_URL}?${query.toString()}`);
+    const res = await fetch(`${API_URL}?${query.toString()}`);
+    const json = await res.json();
+    tabulatorRef.current?.setData(json.data);
   };
 
-  const handleClear = () => {
+  const handleClear = async () => {
     setSearchName("");
     setSearchPosition("");
-    tabulatorRef.current?.setData(`${API_URL}?page=1&size=20`);
+    const res = await fetch(`${API_URL}?page=1&size=20`);
+    const json = await res.json();
+    tabulatorRef.current?.setData(json.data);
   };
 
   return (
