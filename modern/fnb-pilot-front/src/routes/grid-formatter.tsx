@@ -145,26 +145,26 @@ function GridFormatterPage() {
   }, []);
 
   const handleSearch = () => {
-    const filters: { field: string; type: string; value: string }[] = [];
+    const filters: { field: string; value: string }[] = [];
     if (searchName.trim()) {
-      filters.push({ field: "name", type: "like", value: searchName.trim() });
+      filters.push({ field: "name", value: searchName.trim() });
     }
     if (searchPosition.trim()) {
-      filters.push({
-        field: "position",
-        type: "like",
-        value: searchPosition.trim(),
-      });
+      filters.push({ field: "position", value: searchPosition.trim() });
     }
+    const query = new URLSearchParams();
+    query.set("page", "1");
+    query.set("size", "20");
     if (filters.length > 0) {
-      tabulatorRef.current?.setFilter(filters);
+      query.set("filter", JSON.stringify(filters));
     }
+    tabulatorRef.current?.setData(`${API_URL}?${query.toString()}`);
   };
 
   const handleClear = () => {
     setSearchName("");
     setSearchPosition("");
-    tabulatorRef.current?.clearFilter();
+    tabulatorRef.current?.setData(`${API_URL}?page=1&size=20`);
   };
 
   return (
