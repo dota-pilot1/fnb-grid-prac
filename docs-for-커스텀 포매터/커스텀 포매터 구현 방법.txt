@@ -1,0 +1,186 @@
+========================================
+  Tabulator 커스텀 포매터
+========================================
+
+■ 개요
+  셀에 단순 텍스트 대신 HTML을 렌더링하여
+  뱃지, 프로그레스바, 아바타, 별점 등을 표현.
+  formatter 속성에 함수를 넣으면 된다.
+
+
+========================================
+  1. formatter 기본 문법
+========================================
+
+  ■ 내장 포매터 (문자열)
+  { title: "진행률", field: "progress", formatter: "progress" }
+  { title: "체크", field: "active", formatter: "tickCross" }
+  { title: "별점", field: "rating", formatter: "star" }
+
+  ■ 커스텀 포매터 (함수)
+  {
+    title: "이름",
+    field: "name",
+    formatter: (cell) => {
+      const value = cell.getValue();
+      return `<b>${value}</b>`;    // HTML 문자열 반환
+    },
+  }
+
+  formatter 함수가 반환하는 HTML이 셀 안에 그대로 렌더링된다.
+
+
+========================================
+  2. 우리 구현에서 사용한 포매터들
+========================================
+
+  ■ ID — #접두사 + 회색 텍스트
+  formatter: (cell) => {
+    const v = cell.getValue();
+    return `<span style="color:#999;font-size:12px">#${v}</span>`;
+  }
+
+  → #1, #2, #3 ... 으로 표시
+
+
+  ■ 이름 — 이니셜 아바타 + 이름
+  formatter: (cell) => {
+    const name = cell.getValue();
+    const initial = name.charAt(0);
+    return `<div style="display:flex;align-items:center;gap:8px">
+      <div style="width:28px;height:28px;border-radius:50%;
+                  background:#7c4dff;color:#fff;
+                  display:flex;align-items:center;justify-content:center;
+                  font-size:13px;font-weight:bold">${initial}</div>
+      <span>${name}</span>
+    </div>`;
+  }
+
+  → 보라색 원 안에 첫 글자 + 옆에 이름
+
+
+  ■ 나이 — 프로그레스바
+  formatter: (cell) => {
+    const age = cell.getValue();
+    const pct = Math.min((age / 60) * 100, 100);
+    const color = age >= 50 ? "#f44336"
+                : age >= 35 ? "#ff9800"
+                : "#4caf50";
+    return `<div style="display:flex;align-items:center;gap:8px">
+      <div style="flex:1;height:8px;background:#eee;border-radius:4px;overflow:hidden">
+        <div style="width:${pct}%;height:100%;background:${color};border-radius:4px"></div>
+      </div>
+      <span style="font-size:12px">${age}</span>
+    </div>`;
+  }
+
+  → 나이에 비례하는 바 + 색상 (초록/주황/빨강)
+
+
+  ■ 직책 — 색상 뱃지
+  const positionColor = {
+    사원: { bg: "#e3f2fd", text: "#1565c0" },
+    대리: { bg: "#e8f5e9", text: "#2e7d32" },
+    과장: { bg: "#fff3e0", text: "#e65100" },
+    // ...
+  };
+
+  formatter: (cell) => {
+    const pos = cell.getValue();
+    const c = positionColor[pos] || { bg: "#eee", text: "#333" };
+    return `<span style="padding:2px 10px;border-radius:12px;
+                  background:${c.bg};color:${c.text};
+                  font-size:12px;font-weight:600">${pos}</span>`;
+  }
+
+  → 직책별 다른 색상의 둥근 뱃지
+
+
+  ■ 등급 — 나이 기반 별점
+  formatter: (cell) => {
+    const age = cell.getValue();
+    if (age >= 50) return '<span style="color:#f44336">★★★</span>';
+    if (age >= 35) return '<span style="color:#ff9800">★★</span>';
+    return '<span style="color:#4caf50">★</span>';
+  }
+
+  → 값에 따라 별 개수와 색상이 달라짐
+
+
+========================================
+  3. rowFormatter (행 전체 스타일)
+========================================
+
+  행 단위로 스타일을 적용하고 싶을 때:
+
+  rowFormatter: (row) => {
+    const data = row.getData();
+    if (data.age >= 50) {
+      row.getElement().style.fontWeight = "600";
+    }
+  }
+
+  → 50세 이상 행 전체 볼드 처리
+  → formatter가 셀 단위라면, rowFormatter는 행 단위
+
+
+========================================
+  4. 내장 포매터 목록
+========================================
+
+  | 포매터       | 설명                         |
+  |-------------|------------------------------|
+  | "plaintext" | 기본 (텍스트만)                |
+  | "textarea"  | 여러 줄 텍스트                 |
+  | "html"      | HTML 그대로 렌더링             |
+  | "money"     | 통화 형식 ($1,234.56)         |
+  | "image"     | 이미지 태그                    |
+  | "link"      | 하이퍼링크                     |
+  | "tickCross" | ✓/✗ 체크 표시                  |
+  | "star"      | 별점 (1~5)                    |
+  | "progress"  | 프로그레스바 (0~100)            |
+  | "color"     | 색상 셀 (#hex)                |
+  | "rownum"    | 행 번호                       |
+
+  formatterParams로 옵션 전달:
+  {
+    formatter: "money",
+    formatterParams: { thousand: ",", symbol: "₩", precision: 0 },
+  }
+
+
+========================================
+  5. formatter vs formatterParams vs 커스텀 함수
+========================================
+
+  | 방식              | 언제 쓰나                   |
+  |------------------|----------------------------|
+  | 내장 포매터 문자열  | 간단한 형식 (통화, 체크, 별점) |
+  | formatterParams   | 내장 포매터의 옵션 커스텀      |
+  | 커스텀 함수        | 자유로운 HTML 렌더링 필요할 때 |
+
+  대부분의 실무 요구사항은 커스텀 함수로 해결.
+  HTML 문자열을 반환하기만 하면 되므로 자유도가 높다.
+
+
+========================================
+  6. 백엔드 변경사항
+========================================
+
+  없음.
+  포매터는 100% 프론트엔드 기능.
+  서버 데이터는 그대로, 화면 표시만 바꾸는 것.
+
+
+========================================
+  7. 변경 파일 요약
+========================================
+
+  | 파일                                                 | 변경 내용          |
+  |-----------------------------------------------------|--------------------|
+  | fnb-pilot-front/src/routes/grid-formatter.tsx        | 새 페이지 추가      |
+  | fnb-pilot-front/src/routes/__root.tsx                | 네비 링크 추가      |
+  | modern/fnb-pilot-front/src/routes/grid-formatter.tsx | 새 페이지 추가      |
+  | modern/fnb-pilot-front/src/routes/__root.tsx         | 네비 링크 추가      |
+
+  백엔드 변경: 0줄

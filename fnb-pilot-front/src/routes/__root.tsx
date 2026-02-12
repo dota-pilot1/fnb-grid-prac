@@ -51,6 +51,9 @@ export const Route = createRootRoute({
         <Link to="/grid-validate" style={linkStyle}>
           유효성 검사
         </Link>
+        <Link to="/grid-formatter" style={linkStyle}>
+          커스텀 포매터
+        </Link>
       </nav>
       <main style={{ flex: 1, padding: "24px 32px", overflow: "auto" }}>
         <Outlet />
