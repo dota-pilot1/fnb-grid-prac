@@ -1,4 +1,4 @@
-package com.hyun.fnb.employee;
+package com.hyun.fnb.team;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -7,11 +7,8 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class Employee {
-
+public class Team {
     private Long id;
     private String name;
-    private Integer age;
-    private String position;
-    private Long teamId;
+    private String description;
 }

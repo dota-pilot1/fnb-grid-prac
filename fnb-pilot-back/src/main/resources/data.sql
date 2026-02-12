@@ -1001,3 +1001,20 @@ INSERT INTO employees (name, age, position) SELECT name, age, position FROM (VAL
     ('임현우', 31, '인턴')
 ) AS v(name, age, position)
 WHERE NOT EXISTS (SELECT 1 FROM employees);
+
+-- 팀 시드 데이터
+INSERT INTO teams (name, description) SELECT name, description FROM (VALUES
+    ('개발팀', '서비스 개발 및 유지보수'),
+    ('디자인팀', 'UI/UX 디자인'),
+    ('기획팀', '서비스 기획 및 요구사항 분석'),
+    ('영업팀', '고객 영업 및 계약 관리'),
+    ('QA팀', '품질 보증 및 테스트')
+) AS v(name, description)
+WHERE NOT EXISTS (SELECT 1 FROM teams);
+
+-- employees에 팀 배정
+UPDATE employees SET team_id = 1 WHERE position IN ('개발자', 'DevOps') AND team_id IS NULL;
+UPDATE employees SET team_id = 2 WHERE position = '디자이너' AND team_id IS NULL;
+UPDATE employees SET team_id = 3 WHERE position IN ('기획자', '데이터분석가') AND team_id IS NULL;
+UPDATE employees SET team_id = 4 WHERE position IN ('매니저', '마케터', '영업') AND team_id IS NULL;
+UPDATE employees SET team_id = 5 WHERE position IN ('QA', '인턴') AND team_id IS NULL;

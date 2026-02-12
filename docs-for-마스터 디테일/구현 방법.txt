@@ -1,0 +1,170 @@
+========================================
+  마스터-디테일 구현 방법
+========================================
+
+■ 개요
+  왼쪽 그리드(마스터)에서 행을 클릭하면
+  오른쪽 그리드(디테일)에 관련 데이터가 표시되는 패턴.
+
+  예시: 팀 목록 클릭 → 해당 팀의 팀원 목록 표시
+
+  ┌──────────────┐  ┌──────────────────────────┐
+  │ 개발팀    ◀──│──│ 김민수  개발자  28세       │
+  │ 디자인팀     │  │ 이지은  개발자  31세       │
+  │ 기획팀       │  │ 박서연  DevOps  26세       │
+  │ 영업팀       │  │                           │
+  └──────────────┘  └──────────────────────────┘
+    마스터 (팀)        디테일 (팀원)
+
+
+========================================
+  1. 백엔드 API 설계
+========================================
+
+  GET /api/teams           → 팀 목록 (마스터 데이터)
+  GET /api/teams/:id/members → 팀별 팀원 목록 (디테일 데이터)
+
+  teams 테이블: id, name, description
+  employees 테이블: 기존 + team_id 컬럼 추가
+
+  팀 응답 예시:
+  [
+    { "id": 1, "name": "개발팀", "description": "서비스 개발 및 유지보수" },
+    { "id": 2, "name": "디자인팀", "description": "UI/UX 디자인" },
+    ...
+  ]
+
+  팀원 응답 예시 (GET /api/teams/1/members):
+  [
+    { "id": 1, "name": "김민수", "age": 22, "position": "개발자", "teamId": 1 },
+    { "id": 9, "name": "장민수", "age": 30, "position": "DevOps", "teamId": 1 },
+    ...
+  ]
+
+
+========================================
+  2. 프론트엔드 핵심 구조
+========================================
+
+  Tabulator 인스턴스 2개를 사용한다.
+
+  const masterRef = useRef<HTMLDivElement>(null);   // 마스터 그리드 DOM
+  const detailRef = useRef<HTMLDivElement>(null);   // 디테일 그리드 DOM
+  const masterTable = useRef<Tabulator | null>(null);
+  const detailTable = useRef<Tabulator | null>(null);
+
+
+========================================
+  3. 마스터 그리드 (팀 목록)
+========================================
+
+  masterTable.current = new Tabulator(masterRef.current, {
+    layout: "fitColumns",
+    selectable: 1,              // ← 1행만 선택 가능
+    columns: [
+      { title: "ID", field: "id", width: 60 },
+      { title: "팀명", field: "name", width: 120 },
+      { title: "설명", field: "description" },
+    ],
+  });
+
+  // 데이터 로드
+  fetch(API_URL)
+    .then(res => res.json())
+    .then(data => masterTable.current?.setData(data));
+
+  핵심 옵션:
+  - selectable: 1 → 한 행만 선택 가능 (클릭 시 하이라이트)
+
+
+========================================
+  4. 행 클릭 이벤트 → 디테일 로드
+========================================
+
+  masterTable.current.on("rowClick", (_e, row) => {
+    const team = row.getData();
+    setSelectedTeam(team.name);
+
+    fetch(`${API_URL}/${team.id}/members`)
+      .then(res => res.json())
+      .then(members => detailTable.current?.setData(members));
+  });
+
+  흐름:
+  1. 마스터 행 클릭
+  2. row.getData()로 팀 정보 추출
+  3. GET /api/teams/{id}/members 호출
+  4. 응답을 디테일 그리드에 setData()
+
+  이게 마스터-디테일의 전부다.
+
+
+========================================
+  5. 디테일 그리드 (팀원 목록)
+========================================
+
+  detailTable.current = new Tabulator(detailRef.current, {
+    layout: "fitColumns",
+    placeholder: "왼쪽에서 팀을 선택하세요",
+    columns: [
+      { title: "ID", field: "id", width: 60 },
+      { title: "이름", field: "name", width: 100 },
+      { title: "나이", field: "age", width: 70 },
+      { title: "직책", field: "position", width: 120 },
+    ],
+  });
+
+  핵심 옵션:
+  - placeholder → 데이터 없을 때 표시할 안내 메시지
+
+
+========================================
+  6. 레이아웃 (JSX)
+========================================
+
+  <div style={{ display: "flex", gap: "16px" }}>
+    <div style={{ width: "350px" }}>
+      <h3>팀 목록</h3>
+      <div ref={masterRef} />
+    </div>
+    <div style={{ flex: 1 }}>
+      <h3>{selectedTeam} 팀원</h3>
+      <div ref={detailRef} />
+    </div>
+  </div>
+
+  - flexbox로 좌우 배치
+  - 마스터: 고정 너비 (350px)
+  - 디테일: 나머지 공간 (flex: 1)
+
+
+========================================
+  7. 핵심 포인트
+========================================
+
+  ■ Tabulator 인스턴스 2개
+    마스터와 디테일 각각 독립적인 Tabulator.
+    서로 데이터가 섞이지 않는다.
+
+  ■ rowClick 이벤트
+    마스터의 rowClick에서 디테일을 갱신.
+    이 한 줄이 마스터-디테일의 핵심 연결.
+
+  ■ selectable: 1
+    클릭한 행이 하이라이트되어 현재 선택 상태가 보임.
+
+  ■ placeholder
+    초기 상태에서 "팀을 선택하세요" 메시지 표시.
+
+
+========================================
+  8. 변경 파일 요약
+========================================
+
+  | 파일                                  | 변경 내용                    |
+  |--------------------------------------|----------------------------|
+  | 백엔드 schema (양쪽)                   | teams 테이블 + employees에 team_id 추가 |
+  | 백엔드 controller/service (양쪽)       | GET /api/teams, GET /api/teams/:id/members |
+  | fnb-pilot-front/.../grid-master-detail.tsx  | 마스터-디테일 페이지 (Spring) |
+  | modern/fnb-pilot-front/.../grid-master-detail.tsx | 마스터-디테일 페이지 (NestJS) |
+  | 양쪽 __root.tsx                        | 네비게이션에 "마스터-디테일" 링크 추가 |

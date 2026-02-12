@@ -54,6 +54,9 @@ export const Route = createRootRoute({
         <Link to="/grid-formatter" style={linkStyle}>
           커스텀 포매터
         </Link>
+        <Link to="/grid-master-detail" style={linkStyle}>
+          마스터-디테일
+        </Link>
       </nav>
       <main style={{ flex: 1, padding: "24px 32px", overflow: "auto" }}>
         <Outlet />

@@ -13,6 +13,7 @@ import { Route as GridValidateRouteImport } from './routes/grid-validate'
 import { Route as GridUpdateRouteImport } from './routes/grid-update'
 import { Route as GridServerRouteImport } from './routes/grid-server'
 import { Route as GridSaveRouteImport } from './routes/grid-save'
+import { Route as GridMasterDetailRouteImport } from './routes/grid-master-detail'
 import { Route as GridInlineRouteImport } from './routes/grid-inline'
 import { Route as GridFormatterRouteImport } from './routes/grid-formatter'
 import { Route as GridBatchRouteImport } from './routes/grid-batch'
@@ -39,6 +40,11 @@ const GridServerRoute = GridServerRouteImport.update({
 const GridSaveRoute = GridSaveRouteImport.update({
   id: '/grid-save',
   path: '/grid-save',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GridMasterDetailRoute = GridMasterDetailRouteImport.update({
+  id: '/grid-master-detail',
+  path: '/grid-master-detail',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GridInlineRoute = GridInlineRouteImport.update({
@@ -85,6 +91,7 @@ export interface FileRoutesByFullPath {
   '/grid-batch': typeof GridBatchRoute
   '/grid-formatter': typeof GridFormatterRoute
   '/grid-inline': typeof GridInlineRoute
+  '/grid-master-detail': typeof GridMasterDetailRoute
   '/grid-save': typeof GridSaveRoute
   '/grid-server': typeof GridServerRoute
   '/grid-update': typeof GridUpdateRoute
@@ -98,6 +105,7 @@ export interface FileRoutesByTo {
   '/grid-batch': typeof GridBatchRoute
   '/grid-formatter': typeof GridFormatterRoute
   '/grid-inline': typeof GridInlineRoute
+  '/grid-master-detail': typeof GridMasterDetailRoute
   '/grid-save': typeof GridSaveRoute
   '/grid-server': typeof GridServerRoute
   '/grid-update': typeof GridUpdateRoute
@@ -112,6 +120,7 @@ export interface FileRoutesById {
   '/grid-batch': typeof GridBatchRoute
   '/grid-formatter': typeof GridFormatterRoute
   '/grid-inline': typeof GridInlineRoute
+  '/grid-master-detail': typeof GridMasterDetailRoute
   '/grid-save': typeof GridSaveRoute
   '/grid-server': typeof GridServerRoute
   '/grid-update': typeof GridUpdateRoute
@@ -127,6 +136,7 @@ export interface FileRouteTypes {
     | '/grid-batch'
     | '/grid-formatter'
     | '/grid-inline'
+    | '/grid-master-detail'
     | '/grid-save'
     | '/grid-server'
     | '/grid-update'
@@ -140,6 +150,7 @@ export interface FileRouteTypes {
     | '/grid-batch'
     | '/grid-formatter'
     | '/grid-inline'
+    | '/grid-master-detail'
     | '/grid-save'
     | '/grid-server'
     | '/grid-update'
@@ -153,6 +164,7 @@ export interface FileRouteTypes {
     | '/grid-batch'
     | '/grid-formatter'
     | '/grid-inline'
+    | '/grid-master-detail'
     | '/grid-save'
     | '/grid-server'
     | '/grid-update'
@@ -167,6 +179,7 @@ export interface RootRouteChildren {
   GridBatchRoute: typeof GridBatchRoute
   GridFormatterRoute: typeof GridFormatterRoute
   GridInlineRoute: typeof GridInlineRoute
+  GridMasterDetailRoute: typeof GridMasterDetailRoute
   GridSaveRoute: typeof GridSaveRoute
   GridServerRoute: typeof GridServerRoute
   GridUpdateRoute: typeof GridUpdateRoute
@@ -201,6 +214,13 @@ declare module '@tanstack/react-router' {
       path: '/grid-save'
       fullPath: '/grid-save'
       preLoaderRoute: typeof GridSaveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/grid-master-detail': {
+      id: '/grid-master-detail'
+      path: '/grid-master-detail'
+      fullPath: '/grid-master-detail'
+      preLoaderRoute: typeof GridMasterDetailRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/grid-inline': {
@@ -263,6 +283,7 @@ const rootRouteChildren: RootRouteChildren = {
   GridBatchRoute: GridBatchRoute,
   GridFormatterRoute: GridFormatterRoute,
   GridInlineRoute: GridInlineRoute,
+  GridMasterDetailRoute: GridMasterDetailRoute,
   GridSaveRoute: GridSaveRoute,
   GridServerRoute: GridServerRoute,
   GridUpdateRoute: GridUpdateRoute,

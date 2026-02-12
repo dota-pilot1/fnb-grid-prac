@@ -39,28 +39,18 @@
   ■ Step 2. 검색 함수
 
   const handleSearch = async () => {
-    // 1) 필터 조건 생성
-    const filters = [];
-    if (searchName.trim()) {
-      filters.push({ field: "name", value: searchName.trim() });
-    }
-    if (searchPosition.trim()) {
-      filters.push({ field: "position", value: searchPosition.trim() });
-    }
-
-    // 2) 쿼리 파라미터 조립
+    // 1) 쿼리 파라미터 조립
     const query = new URLSearchParams();
     query.set("page", "1");
     query.set("size", "20");
-    for (const f of filters) {
-      query.set(f.field, f.value);
-    }
+    if (searchName.trim()) query.set("name", searchName.trim());
+    if (searchPosition.trim()) query.set("position", searchPosition.trim());
 
-    // 3) 서버에서 데이터 받아오기
+    // 2) 서버에서 데이터 받아오기
     const res = await fetch(`${API_URL}?${query.toString()}`);
     const json = await res.json();
 
-    // 4) Tabulator에 데이터 넣기
+    // 3) Tabulator에 데이터 넣기
     tabulatorRef.current?.setData(json.data);
   };
 
