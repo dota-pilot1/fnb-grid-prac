@@ -30,13 +30,12 @@ function GridValidatePage() {
           query.set("dir", params.sorters[0].dir);
         }
         if (params.filters && params.filters.length > 0) {
-          const filters = params.filters.map(
-            (f: { field: string; value: string }) => ({
-              field: f.field,
-              value: f.value,
-            }),
-          );
-          query.set("filter", JSON.stringify(filters));
+          for (const f of params.filters as {
+            field: string;
+            value: string;
+          }[]) {
+            query.set(f.field, f.value);
+          }
         }
         return fetch(`${url}?${query.toString()}`).then((res) => res.json());
       },
@@ -81,13 +80,22 @@ function GridValidatePage() {
           headerSort: true,
           editor: "list" as const,
           editorParams: {
-            values: ["사원", "대리", "과장", "차장", "부장", "이사", "상무", "전무", "부사장", "사장"],
+            values: [
+              "사원",
+              "대리",
+              "과장",
+              "차장",
+              "부장",
+              "이사",
+              "상무",
+              "전무",
+              "부사장",
+              "사장",
+            ],
             autocomplete: true,
             listOnEmpty: true,
           },
-          validator: [
-            { type: "required" as const, parameters: undefined },
-          ],
+          validator: [{ type: "required" as const, parameters: undefined }],
         },
         {
           title: "상태",
@@ -178,7 +186,8 @@ function GridValidatePage() {
           <b>나이</b>: 필수, 정수, 1~120
         </div>
         <div>
-          <b>직책</b>: 필수, 목록에서 선택 (사원/대리/과장/차장/부장/이사/상무/전무/부사장/사장)
+          <b>직책</b>: 필수, 목록에서 선택
+          (사원/대리/과장/차장/부장/이사/상무/전무/부사장/사장)
         </div>
       </div>
       <div ref={tableRef} />

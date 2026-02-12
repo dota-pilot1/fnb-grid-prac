@@ -22,17 +22,19 @@ export class EmployeesController {
     @Query('size') size?: string,
     @Query('sort') sort?: string,
     @Query('dir') dir?: 'asc' | 'desc',
-    @Query('filter') filterJson?: string,
+    @Query('name') name?: string,
+    @Query('position') position?: string,
   ) {
-    // page 파라미터가 있으면 서버사이드 페이지네이션
     if (page) {
-      const filter = filterJson ? JSON.parse(filterJson) : undefined;
+      const filter: { field: string; value: string }[] = [];
+      if (name) filter.push({ field: 'name', value: name });
+      if (position) filter.push({ field: 'position', value: position });
       return this.employeesService.findPaginated({
         page: parseInt(page, 10),
         size: parseInt(size || '20', 10),
         sort,
         dir,
-        filter,
+        filter: filter.length > 0 ? filter : undefined,
       });
     }
     return this.employeesService.findAll();

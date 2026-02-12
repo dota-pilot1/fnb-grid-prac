@@ -13,12 +13,21 @@ function GridInlinePage() {
 
   // 변경된 행을 서버에 저장
   const saveRow = useCallback(
-    async (row: { id: number; name: string; age: number; position: string }) => {
+    async (row: {
+      id: number;
+      name: string;
+      age: number;
+      position: string;
+    }) => {
       try {
         await fetch(`${API_URL}/${row.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: row.name, age: row.age, position: row.position }),
+          body: JSON.stringify({
+            name: row.name,
+            age: row.age,
+            position: row.position,
+          }),
         });
         pendingRef.current.delete(row.id);
         // 저장 완료 시 행 배경 잠깐 초록으로 표시
@@ -68,13 +77,12 @@ function GridInlinePage() {
           query.set("dir", params.sorters[0].dir);
         }
         if (params.filters && params.filters.length > 0) {
-          const filters = params.filters.map(
-            (f: { field: string; value: string }) => ({
-              field: f.field,
-              value: f.value,
-            }),
-          );
-          query.set("filter", JSON.stringify(filters));
+          for (const f of params.filters as {
+            field: string;
+            value: string;
+          }[]) {
+            query.set(f.field, f.value);
+          }
         }
         return fetch(`${url}?${query.toString()}`).then((res) => res.json());
       },

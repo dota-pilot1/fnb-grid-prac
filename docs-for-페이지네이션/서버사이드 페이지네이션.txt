@@ -27,12 +27,13 @@
 
 
 ■ 쿼리 파라미터
-
-  page   : 페이지 번호 (1부터 시작)
-  size   : 페이지당 건수 (기본 20)
-  sort   : 정렬 컬럼명 (id, name, age, position)
-  dir    : 정렬 방향 (asc / desc)
-  filter : JSON 배열 [{"field":"name","value":"김"}]
+정리
+  page     : 페이지 번호 (1부터 시작)
+  size     : 페이지당 건수 (기본 20)
+  sort     : 정렬 컬럼명 (id, name, age, position)
+  dir      : 정렬 방향 (asc / desc)
+  name     : 이름 검색어 (선택)
+  position : 직책 검색어 (선택)
 
 
 ■ 응답 형태 (Tabulator가 요구하는 형식)
@@ -56,20 +57,25 @@
     @Query('size') size?: string,
     @Query('sort') sort?: string,
     @Query('dir') dir?: 'asc' | 'desc',
-    @Query('filter') filterJson?: string,
+    @Query('name') name?: string,
+    @Query('position') position?: string,
   ) {
     if (page) {
-      const filter = filterJson ? JSON.parse(filterJson) : undefined;
+      const filter: { field: string; value: string }[] = [];
+      if (name) filter.push({ field: 'name', value: name });
+      if (position) filter.push({ field: 'position', value: position });
       return this.employeesService.findPaginated({
         page: parseInt(page, 10),
         size: parseInt(size || '20', 10),
-        sort, dir, filter,
+        sort, dir,
+        filter: filter.length > 0 ? filter : undefined,
       });
     }
     return this.employeesService.findAll();
   }
 
   핵심: page가 있으면 findPaginated, 없으면 findAll
+  필터: 개별 쿼리 파라미터(name, position)로 받아서 filter 배열로 변환
 
 
 ■ 서비스 - findPaginated (employees.service.ts)
@@ -149,9 +155,9 @@
     }
 
     if (params.filters?.length > 0) {
-      query.set("filter", JSON.stringify(
-        params.filters.map(f => ({ field: f.field, value: f.value }))
-      ));
+      for (const f of params.filters) {
+        query.set(f.field, f.value);
+      }
     }
 
     return fetch(`${url}?${query}`)
@@ -192,7 +198,7 @@
   [Tabulator] ajaxRequestFunc 호출
       params = { page: 2, size: 20, sorters: [...], filters: [...] }
       ↓
-  [fetch] GET /api/employees?page=2&size=20&sort=name&dir=asc
+  [fetch] GET /api/employees?page=2&size=20&sort=name&dir=asc&name=김
       ↓
   [NestJS Controller] page 있음 → findPaginated 호출
       ↓
@@ -240,4 +246,4 @@
 
   Q: 필터가 안 된다
   A: ajaxRequestFunc에서 params.filters 확인.
-     서버에서 filter 쿼리파라미터를 JSON.parse 하는지 확인.
+     서버에서 개별 쿼리 파라미터(name, position)로 받는지 확인.

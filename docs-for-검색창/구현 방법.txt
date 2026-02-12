@@ -52,8 +52,8 @@
     const query = new URLSearchParams();
     query.set("page", "1");
     query.set("size", "20");
-    if (filters.length > 0) {
-      query.set("filter", JSON.stringify(filters));
+    for (const f of filters) {
+      query.set(f.field, f.value);
     }
 
     // 3) 서버에서 데이터 받아오기
@@ -135,17 +135,17 @@
 
   검색어: 이름="김민", 직책=""
 
-  GET /api/employees?page=1&size=20&filter=[{"field":"name","value":"김민"}]
+  GET /api/employees?page=1&size=20&name=김민
 
   검색어: 이름="김민", 직책="개발자"
 
-  GET /api/employees?page=1&size=20&filter=[{"field":"name","value":"김민"},{"field":"position","value":"개발자"}]
+  GET /api/employees?page=1&size=20&name=김민&position=개발자
 
   초기화:
 
   GET /api/employees?page=1&size=20
 
-  → 기존 페이지네이션 API 그대로 사용. 백엔드 변경 없음.
+  → 필터 조건을 개별 쿼리 파라미터로 전달. 직관적이고 REST API 관례에 맞음.
 
 
 ========================================
@@ -160,7 +160,7 @@
   │     ↓                                  │
   │ filters = [{ field:"name", value:"김민" }] │
   │     ↓                                  │
-  │ fetch(API_URL?page=1&size=20&filter=...) │
+  │ fetch(API_URL?page=1&size=20&name=김민)  │
   │     ↓                                  │
   │ json = { last_page: 3, data: [...] }   │
   │     ↓                                  │

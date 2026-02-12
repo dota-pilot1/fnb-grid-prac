@@ -49,13 +49,12 @@ function GridBatchPage() {
           query.set("dir", params.sorters[0].dir);
         }
         if (params.filters && params.filters.length > 0) {
-          const filters = params.filters.map(
-            (f: { field: string; value: string }) => ({
-              field: f.field,
-              value: f.value,
-            }),
-          );
-          query.set("filter", JSON.stringify(filters));
+          for (const f of params.filters as {
+            field: string;
+            value: string;
+          }[]) {
+            query.set(f.field, f.value);
+          }
         }
         return fetch(`${url}?${query.toString()}`).then((res) => res.json());
       },
@@ -180,7 +179,11 @@ function GridBatchPage() {
     const updated = Array.from(updatedRef.current.values());
     const deletedIds = Array.from(deletedRef.current);
 
-    if (created.length === 0 && updated.length === 0 && deletedIds.length === 0) {
+    if (
+      created.length === 0 &&
+      updated.length === 0 &&
+      deletedIds.length === 0
+    ) {
       alert("변경사항이 없습니다.");
       return;
     }
@@ -216,7 +219,8 @@ function GridBatchPage() {
       <h1>행 추가/삭제 + 일괄 저장</h1>
       <p>행을 추가/수정/삭제한 뒤, "일괄 저장" 버튼으로 한 번에 서버 반영</p>
       <p style={{ fontSize: "13px", color: "#888" }}>
-        체크박스로 행 선택 → 삭제 · 셀 클릭하여 편집 · 파란색=새 행 · 노란색=수정됨
+        체크박스로 행 선택 → 삭제 · 셀 클릭하여 편집 · 파란색=새 행 ·
+        노란색=수정됨
       </p>
       <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
         <button onClick={handleAdd}>행 추가</button>
@@ -236,7 +240,11 @@ function GridBatchPage() {
           일괄 저장
           {hasChanges && (
             <span style={{ marginLeft: "6px", fontSize: "12px" }}>
-              ({createdRef.current.size + updatedRef.current.size + deletedRef.current.size}건)
+              (
+              {createdRef.current.size +
+                updatedRef.current.size +
+                deletedRef.current.size}
+              건)
             </span>
           )}
         </button>

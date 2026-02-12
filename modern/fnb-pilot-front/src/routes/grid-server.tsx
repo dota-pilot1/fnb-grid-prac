@@ -42,13 +42,12 @@ function GridServerPage() {
 
         // 필터
         if (params.filters && params.filters.length > 0) {
-          const filters = params.filters.map(
-            (f: { field: string; value: string }) => ({
-              field: f.field,
-              value: f.value,
-            }),
-          );
-          query.set("filter", JSON.stringify(filters));
+          for (const f of params.filters as {
+            field: string;
+            value: string;
+          }[]) {
+            query.set(f.field, f.value);
+          }
         }
 
         return fetch(`${url}?${query.toString()}`).then((res) => res.json());

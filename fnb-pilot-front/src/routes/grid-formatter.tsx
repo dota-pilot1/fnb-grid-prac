@@ -46,13 +46,12 @@ function GridFormatterPage() {
           query.set("dir", params.sorters[0].dir);
         }
         if (params.filters && params.filters.length > 0) {
-          const filters = params.filters.map(
-            (f: { field: string; value: string }) => ({
-              field: f.field,
-              value: f.value,
-            }),
-          );
-          query.set("filter", JSON.stringify(filters));
+          for (const f of params.filters as {
+            field: string;
+            value: string;
+          }[]) {
+            query.set(f.field, f.value);
+          }
         }
         return fetch(`${url}?${query.toString()}`).then((res) => res.json());
       },
@@ -155,8 +154,8 @@ function GridFormatterPage() {
     const query = new URLSearchParams();
     query.set("page", "1");
     query.set("size", "20");
-    if (filters.length > 0) {
-      query.set("filter", JSON.stringify(filters));
+    for (const f of filters) {
+      query.set(f.field, f.value);
     }
     const res = await fetch(`${API_URL}?${query.toString()}`);
     const json = await res.json();

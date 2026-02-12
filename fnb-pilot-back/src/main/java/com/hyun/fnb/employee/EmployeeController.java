@@ -1,7 +1,6 @@
 package com.hyun.fnb.employee;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -14,7 +13,6 @@ import org.springframework.web.bind.annotation.*;
 public class EmployeeController {
 
     private final EmployeeService employeeService;
-    private final ObjectMapper objectMapper;
 
     @GetMapping
     public Object findAll(
@@ -22,22 +20,23 @@ public class EmployeeController {
         @RequestParam(required = false, defaultValue = "20") Integer size,
         @RequestParam(required = false) String sort,
         @RequestParam(required = false, defaultValue = "asc") String dir,
-        @RequestParam(required = false) String filter
-    ) throws Exception {
+        @RequestParam(required = false) String name,
+        @RequestParam(required = false) String position
+    ) {
         if (page != null) {
-            List<FilterParam> filters = null;
-            if (filter != null && !filter.isBlank()) {
-                filters = objectMapper.readValue(
-                    filter,
-                    new TypeReference<>() {}
-                );
+            List<FilterParam> filters = new ArrayList<>();
+            if (name != null && !name.isBlank()) {
+                filters.add(new FilterParam("name", name));
+            }
+            if (position != null && !position.isBlank()) {
+                filters.add(new FilterParam("position", position));
             }
             return employeeService.findPaginated(
                 page,
                 size,
                 sort,
                 dir,
-                filters
+                filters.isEmpty() ? null : filters
             );
         }
         return employeeService.findAll();
