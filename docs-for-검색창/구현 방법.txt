@@ -1,0 +1,198 @@
+========================================
+  외부 검색창 구현 방법
+========================================
+
+■ 개요
+  그리드 위에 검색 input + 버튼을 배치.
+  버튼 클릭(또는 Enter) 시에만 서버에 검색 요청.
+  headerFilter(컬럼 아래 입력란)와 달리 글자마다 요청하지 않음.
+
+
+========================================
+  1. headerFilter vs 외부 검색창
+========================================
+
+  | 구분           | headerFilter          | 외부 검색창              |
+  |---------------|----------------------|------------------------|
+  | 위치           | 컬럼 헤더 아래           | 그리드 위에 별도 영역       |
+  | 검색 시점       | 글자 입력할 때마다        | 버튼 클릭 or Enter 시     |
+  | 서버 요청       | 키 입력마다 발생          | 버튼 1번에 1회            |
+  | 문제점         | 번쩍임, 과도한 API 호출    | 없음                    |
+  | 적합한 상황     | 클라이언트사이드 필터       | 서버사이드 필터            |
+
+  서버사이드 페이지네이션에서는 외부 검색창이 적합하다.
+  headerFilter는 글자마다 서버 요청이 발생해서 번쩍이고 느림.
+
+
+========================================
+  2. 핵심 구현 (3단계)
+========================================
+
+  ■ Step 1. 상태 선언
+
+  const [searchName, setSearchName] = useState("");
+  const [searchPosition, setSearchPosition] = useState("");
+
+  → React state로 검색어 관리
+
+
+  ■ Step 2. 검색 함수
+
+  const handleSearch = async () => {
+    // 1) 필터 조건 생성
+    const filters = [];
+    if (searchName.trim()) {
+      filters.push({ field: "name", value: searchName.trim() });
+    }
+    if (searchPosition.trim()) {
+      filters.push({ field: "position", value: searchPosition.trim() });
+    }
+
+    // 2) 쿼리 파라미터 조립
+    const query = new URLSearchParams();
+    query.set("page", "1");
+    query.set("size", "20");
+    if (filters.length > 0) {
+      query.set("filter", JSON.stringify(filters));
+    }
+
+    // 3) 서버에서 데이터 받아오기
+    const res = await fetch(`${API_URL}?${query.toString()}`);
+    const json = await res.json();
+
+    // 4) Tabulator에 데이터 넣기
+    tabulatorRef.current?.setData(json.data);
+  };
+
+  핵심: fetch로 직접 호출 → json.data만 꺼내서 setData()
+
+
+  ■ Step 3. 초기화 함수
+
+  const handleClear = async () => {
+    setSearchName("");
+    setSearchPosition("");
+    const res = await fetch(`${API_URL}?page=1&size=20`);
+    const json = await res.json();
+    tabulatorRef.current?.setData(json.data);
+  };
+
+  → 검색어 비우고 전체 데이터 다시 로드
+
+
+========================================
+  3. JSX (검색 폼)
+========================================
+
+  <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
+    <input
+      placeholder="이름 검색"
+      value={searchName}
+      onChange={(e) => setSearchName(e.target.value)}
+      onKeyDown={(e) => { if (e.key === "Enter") handleSearch(); }}
+    />
+    <input
+      placeholder="직책 검색"
+      value={searchPosition}
+      onChange={(e) => setSearchPosition(e.target.value)}
+      onKeyDown={(e) => { if (e.key === "Enter") handleSearch(); }}
+    />
+    <button onClick={handleSearch}>검색</button>
+    <button onClick={handleClear}>초기화</button>
+  </div>
+
+  onKeyDown에서 Enter 키 감지 → handleSearch 호출
+  → 버튼 안 눌러도 Enter로 검색 가능
+
+
+========================================
+  4. 왜 setFilter가 아니라 fetch + setData인가?
+========================================
+
+  처음에 시도한 방법:
+  tabulatorRef.current?.setFilter([
+    { field: "name", type: "like", value: "김민" },
+  ]);
+
+  문제:
+  - setFilter는 Tabulator 내부 필터 시스템을 사용
+  - 서버사이드 모드(ajaxRequestFunc)에서는
+    setFilter의 type("like")이 서버로 제대로 전달되지 않음
+  - 결과: 검색이 안 먹음
+
+  해결:
+  - fetch로 직접 서버 API 호출
+  - 응답에서 json.data (배열)만 꺼내서
+  - tabulatorRef.current?.setData(json.data) 로 데이터 교체
+
+  setData()는 배열을 받으면 Tabulator가 그대로 렌더링한다.
+  서버 통신은 우리가 직접 제어하므로 확실하게 동작.
+
+
+========================================
+  5. 서버에 전달되는 쿼리 예시
+========================================
+
+  검색어: 이름="김민", 직책=""
+
+  GET /api/employees?page=1&size=20&filter=[{"field":"name","value":"김민"}]
+
+  검색어: 이름="김민", 직책="개발자"
+
+  GET /api/employees?page=1&size=20&filter=[{"field":"name","value":"김민"},{"field":"position","value":"개발자"}]
+
+  초기화:
+
+  GET /api/employees?page=1&size=20
+
+  → 기존 페이지네이션 API 그대로 사용. 백엔드 변경 없음.
+
+
+========================================
+  6. 흐름 정리
+========================================
+
+  ┌──────────────────────────────────────┐
+  │ [이름: 김민] [직책:    ] [검색] [초기화] │
+  │     ↓ (버튼 클릭 or Enter)             │
+  │                                       │
+  │ handleSearch()                         │
+  │     ↓                                  │
+  │ filters = [{ field:"name", value:"김민" }] │
+  │     ↓                                  │
+  │ fetch(API_URL?page=1&size=20&filter=...) │
+  │     ↓                                  │
+  │ json = { last_page: 3, data: [...] }   │
+  │     ↓                                  │
+  │ tabulatorRef.current.setData(json.data) │
+  │     ↓                                  │
+  │ 그리드에 필터된 데이터 표시              │
+  └──────────────────────────────────────┘
+
+
+========================================
+  7. 주의사항
+========================================
+
+  ■ setData 후 페이지네이션
+    setData(배열)로 넣으면 Tabulator의 서버사이드 페이지네이션이
+    일시적으로 해제됨 (로컬 데이터 모드가 됨).
+    검색 결과가 20건 이하면 문제없지만,
+    대량 결과에서 페이지네이션이 필요하면
+    ajaxURL을 필터 포함 URL로 변경하는 방식이 더 적합.
+
+  ■ headerFilter와 혼용 금지
+    외부 검색창을 쓰면 headerFilter는 빼야 함.
+    둘 다 있으면 필터가 충돌할 수 있음.
+
+
+========================================
+  8. 변경 파일 요약
+========================================
+
+  | 파일                                                 | 변경 내용                    |
+  |-----------------------------------------------------|-----------------------------|
+  | fnb-pilot-front/src/routes/grid-formatter.tsx        | headerFilter 제거, 검색폼 추가 |
+  | modern/fnb-pilot-front/src/routes/grid-formatter.tsx | 동일                         |
+
+  백엔드 변경: 0줄
